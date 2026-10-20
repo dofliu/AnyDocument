@@ -11,7 +11,7 @@
 
 ## Phase 0 — 專案基礎
 
-- [ ] **T001 專案骨架**
+- [x] **T001 專案骨架**
   - 相依：無
   - 內容：`pyproject.toml`（hatchling、`src/` layout、套件名 `anydoc`、extras `dev`）；ruff、mypy、pytest、pytest-cov 設定；
     `src/anydoc/__init__.py`（`__version__`）；`tests/` 結構；`.gitignore`；GitHub Actions CI（lint + typecheck + test）。
