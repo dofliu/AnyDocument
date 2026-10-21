@@ -17,7 +17,7 @@
     `src/anydoc/__init__.py`（`__version__`）；`tests/` 結構；`.gitignore`；GitHub Actions CI（lint + typecheck + test）。
   - 驗收：`pip install -e ".[dev]"` 成功；`ruff check`、`mypy src`、`pytest` 全部通過（至少 1 個 smoke test）。
 
-- [ ] **T002 統一文件模型與例外**
+- [x] **T002 統一文件模型與例外**
   - 相依：T001
   - 內容：`core/model.py`（`Capability`、`Metadata`、`Part`、`Document` 基底類別）、`core/errors.py` 例外階層（見架構 §6）。
   - 驗收：單元測試涵蓋模型建立、序列化為 dict/JSON、例外繼承關係。
