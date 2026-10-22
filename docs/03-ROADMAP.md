@@ -22,7 +22,7 @@
   - 內容：`core/model.py`（`Capability`、`Metadata`、`Part`、`Document` 基底類別）、`core/errors.py` 例外階層（見架構 §6）。
   - 驗收：單元測試涵蓋模型建立、序列化為 dict/JSON、例外繼承關係。
 
-- [ ] **T003 Handler 註冊表與格式辨識**
+- [x] **T003 Handler 註冊表與格式辨識**
   - 相依：T002
   - 內容：`core/registry.py`（註冊、依 format/副檔名/MIME 查詢、entry_points 載入）；`core/detect.py`
     （magic bytes：PDF、ZIP-based OOXML/ODF 依內部檔名分辨 docx/xlsx/pptx/odt…、OLE2、DXF 文字頭、DWG `AC10xx`、PNG/JPG…；
