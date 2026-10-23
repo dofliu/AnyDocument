@@ -29,7 +29,7 @@
     文字類以內容探測）；公開 `anydoc.detect(path)`、`anydoc.open(path)`。
   - 驗收：對每種格式的樣本（可用最小位元組串）辨識正確；副檔名錯誤時仍以內容為準；未知格式拋 `UnsupportedFormatError`。
 
-- [ ] **T004 測試樣本產生器**
+- [x] **T004 測試樣本產生器**
   - 相依：T001
   - 內容：`tests/fixtures/generate.py` 以程式產生 docx/xlsx/pptx/pdf/csv(UTF-8, UTF-8-BOM, Big5)/dxf/png/txt/json 等樣本到
     `tests/fixtures/generated/`（git ignore），提供 pytest fixture `sample(fmt)`；內容需含中文。
