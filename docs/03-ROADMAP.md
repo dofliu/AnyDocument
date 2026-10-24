@@ -35,7 +35,7 @@
     `tests/fixtures/generated/`（git ignore），提供 pytest fixture `sample(fmt)`；內容需含中文。
   - 驗收：`pytest` 執行時自動產生；每種樣本可被對應函式庫開啟。
 
-- [ ] **T005 測試報告產生器**
+- [x] **T005 測試報告產生器**
   - 相依：T001
   - 內容：`scripts/make_test_report.py`：執行 ruff、mypy、pytest（`--junitxml` + coverage json），輸出
     `docs/test-reports/<YYYY-MM-DD>_<TaskID>.md`（格式見 `docs/04-TESTING.md` §4），並更新 `docs/test-reports/INDEX.md`。
