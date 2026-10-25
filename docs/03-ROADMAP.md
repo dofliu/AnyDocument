@@ -41,7 +41,7 @@
     `docs/test-reports/<YYYY-MM-DD>_<TaskID>.md`（格式見 `docs/04-TESTING.md` §4），並更新 `docs/test-reports/INDEX.md`。
   - 驗收：執行 `python scripts/make_test_report.py --task T005 --title "..."` 產生正確報告。
 
-- [ ] **T006 CLI 骨架**
+- [x] **T006 CLI 骨架**
   - 相依：T003
   - 內容：Typer 應用 `anydoc`，指令：`formats`（列出支援格式與能力）、`detect <file>`、`info <file>`（JSON 輸出 metadata/parts）。
   - 驗收：CliRunner 測試涵蓋各指令與錯誤輸出（非零結束碼）。

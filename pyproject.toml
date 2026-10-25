@@ -9,7 +9,12 @@ description = "Universal document viewer, converter and editor toolkit."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-dependencies = []
+dependencies = [
+    "typer>=0.12",  # MIT
+]
+
+[project.scripts]
+anydoc = "anydoc.cli:main"
 
 [project.optional-dependencies]
 dev = [
