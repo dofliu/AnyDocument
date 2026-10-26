@@ -26,3 +26,13 @@ def sample(generated_samples: dict[str, Path]) -> Callable[[str], Path]:
         return generated_samples[fmt]
 
     return _get
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Skip tests marked ``requires(tool)`` when the external tool is not installed."""
+    from anydoc.external import is_available
+
+    for marker in item.iter_markers(name="requires"):
+        for tool in marker.args:
+            if not is_available(tool):
+                pytest.skip(f"external tool not available: {tool}")

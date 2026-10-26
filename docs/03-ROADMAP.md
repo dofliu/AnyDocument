@@ -46,7 +46,7 @@
   - 內容：Typer 應用 `anydoc`，指令：`formats`（列出支援格式與能力）、`detect <file>`、`info <file>`（JSON 輸出 metadata/parts）。
   - 驗收：CliRunner 測試涵蓋各指令與錯誤輸出（非零結束碼）。
 
-- [ ] **T007 外部工具偵測層**
+- [x] **T007 外部工具偵測層**
   - 相依：T002
   - 內容：`external/`：LibreOffice、Tesseract、ODA File Converter、LibreDWG 的存在偵測與執行包裝（逾時、暫存目錄）；
     pytest marker `requires(tool)` 自動 skip。

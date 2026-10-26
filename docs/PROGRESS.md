@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-26 | T007 外部工具偵測層 | ✅ 完成 | 174 passed | [報告](test-reports/2026-10-26_T007.md) | anydoc.external（libreoffice/tesseract/oda/libredwg 偵測、run_tool 逾時/暫存目錄）；conftest requires marker 自動 skip；ANYDOC_<TOOL> 可覆寫路徑 |
 | 2026-10-25 | T006 CLI 骨架 | ✅ 完成 | 160 passed | [報告](test-reports/2026-10-25_T006.md) | anydoc.cli（formats/detect/info、--version）；新增相依 typer、console script `anydoc`；尚無 Handler 故 info 對真實檔回報 No handler |
 | 2026-10-24 | T005 測試報告產生器 | ✅ 完成 | 147 passed | [報告](test-reports/2026-10-24_T005.md) | scripts/make_test_report.py（ruff/mypy/pytest/coverage → 報告＋INDEX）；CLAUDE.md 第 6 步起可直接使用 |
 | 2026-10-23 | T004 測試樣本產生器 | ✅ 完成 | 141 passed | [報告](test-reports/2026-10-23_T004.md) | tests/fixtures/generate.py 12 種樣本、`sample(fmt)` fixture；dev extras 新增文件函式庫 |
