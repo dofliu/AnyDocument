@@ -169,6 +169,11 @@ def _text_format(text: str, ext_hint: str | None) -> str:
         return "tsv"
     if _looks_like_delimited(text, ","):
         return "csv"
+    # Semicolon/pipe tables are too ambiguous to claim without a .csv/.tsv extension.
+    if ext_hint in ("csv", "tsv", "tab") and any(
+        _looks_like_delimited(text, d) for d in (";", "|")
+    ):
+        return "csv" if ext_hint == "csv" else "tsv"
     return "txt"
 
 

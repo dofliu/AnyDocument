@@ -232,3 +232,14 @@ def test_entry_points_load() -> None:
     registry.unregister("tsv")
     loaded = registry.load_entry_points()
     assert {"csv", "tsv"} <= set(loaded)
+
+
+def test_anydoc_open_semicolon_csv(tmp_path: Path) -> None:
+    p = tmp_path / "items.csv"
+    p.write_text(
+        "品名;單價;到貨日\n筆記本;45.5;2026-10-01\n原子筆;12;2026-10-03\n", encoding="utf-8"
+    )
+    doc = anydoc.open(p)
+    assert doc.format == "csv"
+    assert doc.metadata.extra["delimiter"] == ";"
+    assert doc.metadata.extra["column_types"] == ["str", "float", "date"]

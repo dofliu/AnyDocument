@@ -184,3 +184,18 @@ def test_single_column_text_is_not_csv() -> None:
 
 def test_inconsistent_columns_not_csv() -> None:
     assert detect_bytes(b"a,b\n1,2,3\n").format == "txt"
+
+
+@pytest.mark.parametrize(
+    ("name", "data", "fmt"),
+    [
+        ("a.csv", "品名;單價\n筆記本;45\n原子筆;12\n".encode(), "csv"),
+        ("a.csv", b"a|b\n1|2\n", "csv"),
+        ("a.tsv", b"a;b\n1;2\n", "tsv"),
+        ("a.txt", b"a;b\n1;2\n", "txt"),
+        (None, b"a;b\n1;2\n", "txt"),
+        ("a.csv", b"just one line of prose; nothing else\n", "txt"),
+    ],
+)
+def test_semicolon_pipe_need_extension_hint(name: str | None, data: bytes, fmt: str) -> None:
+    assert detect_bytes(data, name).format == fmt
