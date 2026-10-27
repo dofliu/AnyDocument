@@ -16,6 +16,10 @@ dependencies = [
 [project.scripts]
 anydoc = "anydoc.cli:main"
 
+[project.entry-points."anydoc.formats"]
+csv = "anydoc.formats.csv:CsvHandler"
+tsv = "anydoc.formats.csv:TsvHandler"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8",

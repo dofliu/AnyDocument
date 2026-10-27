@@ -89,9 +89,9 @@ def test_formats_text_and_json() -> None:
     assert "read" in result.output
     result = runner.invoke(app, ["formats", "--json"])
     data = json.loads(result.output)
-    assert data[0]["format"] == "txt"
-    assert data[0]["capabilities"] == ["read"]
-    assert data[0]["mime_types"] == ["text/plain"]
+    txt = next(row for row in data if row["format"] == "txt")
+    assert txt["capabilities"] == ["read"]
+    assert txt["mime_types"] == ["text/plain"]
 
 
 def test_formats_empty_message(monkeypatch: pytest.MonkeyPatch) -> None:
