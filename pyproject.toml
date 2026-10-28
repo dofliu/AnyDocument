@@ -15,6 +15,7 @@ dependencies = [
     "defusedxml>=0.7",  # PSF
     "python-docx>=1.1",  # MIT
     "openpyxl>=3.1",  # MIT
+    "python-pptx>=1.0",  # MIT
 ]
 
 [project.scripts]
@@ -30,6 +31,7 @@ xml = "anydoc.formats.text:XmlHandler"
 tsv = "anydoc.formats.csv:TsvHandler"
 docx = "anydoc.formats.docx:DocxHandler"
 xlsx = "anydoc.formats.xlsx:XlsxHandler"
+pptx = "anydoc.formats.pptx:PptxHandler"
 
 [project.optional-dependencies]
 dev = [
@@ -41,7 +43,6 @@ dev = [
     "types-defusedxml",
     "types-openpyxl",
     # sample generation / library round-trip checks (all MIT/BSD/HPND)
-    "python-pptx>=1.0",
     "reportlab>=4",
     "pypdf>=4",
     "pdfplumber>=0.11",
