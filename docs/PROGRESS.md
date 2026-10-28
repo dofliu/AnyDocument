@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-28 | T015 PDF 讀取 | ✅ 完成 | 349 passed | [報告](test-reports/2026-10-28_T015.md) | anydoc.formats.pdf（PdfHandler/PdfDocument：中繼資料、頁數、頁面尺寸/旋轉、page_text/words（含座標，pdfplumber）、images、加密狀態與密碼解鎖）；pypdf、pdfplumber 升為正式相依；修正 T004 PDF 樣本中文字型（STSong-Light/UniGB）；CLI/registry「無 handler」測試改用 dxf/png |
 | 2026-10-28 | T014 PPTX 讀取 | ✅ 完成 | 325 passed | [報告](test-reports/2026-10-28_T014.md) | anydoc.formats.pptx（PptxHandler/PptxDocument：投影片＋版面配置名稱、標題、圖形樹（文字框/圖片/表格/圖表/群組）、備忘稿、text()）；python-pptx 升為正式相依；entry_points 註冊 pptx；損毀檔案拋 CorruptFileError |
 | 2026-10-28 | T013 XLSX 讀取 | ✅ 完成 | 305 passed | [報告](test-reports/2026-10-28_T013.md) | anydoc.formats.xlsx（XlsxHandler/XlsxDocument：工作表狀態與使用範圍、儲存格值/型別/公式/快取值、合併儲存格、樣式摘要、定義名稱、text()）；openpyxl 升為正式相依、dev 加 types-openpyxl；entry_points 註冊 xlsx；損毀檔案拋 CorruptFileError |
 | 2026-10-28 | T012 DOCX 讀取 | ✅ 完成 | 280 passed | [報告](test-reports/2026-10-28_T012.md) | anydoc.formats.docx（DocxHandler/DocxDocument：段落＋標題層級、表格、圖片清單、頁首頁尾、註腳（解析 footnotes.xml）、核心屬性、閱讀順序 text()）；python-docx 升為正式相依；以 entry_points 註冊 docx；損毀檔案統一拋 CorruptFileError |

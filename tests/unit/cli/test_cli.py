@@ -135,7 +135,7 @@ def test_info_ok(sample: Callable[[str], Path]) -> None:
 
 
 def test_info_no_handler(sample: Callable[[str], Path]) -> None:
-    result = runner.invoke(app, ["info", str(sample("pdf"))])
+    result = runner.invoke(app, ["info", str(sample("dxf"))])
     assert result.exit_code == 1
     assert "No handler" in result.output
 

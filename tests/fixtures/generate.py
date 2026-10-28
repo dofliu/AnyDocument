@@ -131,19 +131,19 @@ def make_pptx() -> bytes:
 
 
 def make_pdf() -> bytes:
-    """Two-page PDF with extractable Chinese (CID font) and English text."""
+    """Two-page PDF with extractable Chinese (CID font, UniGB encoding) and English text."""
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     from reportlab.pdfgen import canvas
 
-    pdfmetrics.registerFont(UnicodeCIDFont("MSung-Light"))
+    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     c.setTitle(TITLE)
-    c.setFont("MSung-Light", 18)
+    c.setFont("STSong-Light", 18)
     c.drawString(72, 760, TITLE)
-    c.setFont("MSung-Light", 12)
+    c.setFont("STSong-Light", 12)
     c.drawString(72, 730, BODY)
     c.showPage()
     c.setFont("Helvetica", 12)

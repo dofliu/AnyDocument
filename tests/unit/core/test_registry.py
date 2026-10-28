@@ -108,8 +108,8 @@ def test_open_dispatches_to_registered_handler(tmp_path: Path) -> None:
 
 
 def test_open_without_handler_raises(tmp_path: Path) -> None:
-    f = tmp_path / "a.pdf"
-    f.write_bytes(b"%PDF-1.7\n")
+    f = tmp_path / "a.png"
+    f.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 20)
     with (
         patch("anydoc.core.registry.entry_points", return_value=[]),
         pytest.raises(UnsupportedFormatError),
@@ -120,18 +120,18 @@ def test_open_without_handler_raises(tmp_path: Path) -> None:
 def test_open_loads_entry_point_handlers(tmp_path: Path) -> None:
     sentinel = MagicMock()
 
-    class PdfHandler(FakeHandler):
-        format_id: ClassVar[str] = "pdf"
+    class PngEpHandler(FakeHandler):
+        format_id: ClassVar[str] = "png"
 
         def open(self, source: Path | bytes) -> Document:
             return sentinel  # type: ignore[no-any-return]
 
     ep = MagicMock()
-    ep.load.return_value = PdfHandler
-    f = tmp_path / "a.pdf"
-    f.write_bytes(b"%PDF-1.7\n")
+    ep.load.return_value = PngEpHandler
+    f = tmp_path / "a.png"
+    f.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 20)
     try:
         with patch("anydoc.core.registry.entry_points", return_value=[ep]):
             assert anydoc.open(f) is sentinel
     finally:
-        registry.unregister("pdf")
+        registry.unregister("png")
