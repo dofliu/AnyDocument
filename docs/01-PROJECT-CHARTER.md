@@ -131,7 +131,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 ### 5.7 其他格式
 | 功能 | 優先級 | 狀態 | Roadmap |
 |------|------|------|------|
-| TXT / Markdown / JSON / XML / YAML 讀寫 | P0 | ⬜ | T011 |
+| TXT / Markdown / JSON / XML / YAML 讀寫 | P0 | ✅ | T011 |
 | 舊版 DOC / XLS / PPT（經 LibreOffice 轉換） | P1 | ⬜ | T017 |
 | ODT / ODS / ODP | P1 | ⬜ | T018 |
 | 影像：中繼資料、EXIF、縮放、格式轉換 | P1 | ⬜ | T022 |

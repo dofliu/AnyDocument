@@ -55,7 +55,7 @@
 ## Phase 1 — 讀取與檢視（各格式 Handler）
 
 - [x] **T010 CSV/TSV Handler**：編碼偵測（UTF-8、BOM、Big5、CP950）、分隔符號偵測、型別推斷、讀寫、`parts()`=單一表格。相依：T003, T004
-- [ ] **T011 Text 系列 Handler**：TXT、Markdown、JSON、XML、YAML 讀寫與結構化（JSON/YAML→dict，XML→樹）。相依：T003
+- [x] **T011 Text 系列 Handler**：TXT、Markdown、JSON、XML、YAML 讀寫與結構化（JSON/YAML→dict，XML→樹）。相依：T003
 - [ ] **T012 DOCX 讀取**：段落（含樣式/標題層級）、表格、圖片清單、頁首頁尾、註腳、核心屬性；`text()` 保留閱讀順序。相依：T003, T004
 - [ ] **T013 XLSX 讀取**：工作表、使用範圍、儲存格值/型別/公式/快取值、合併儲存格、樣式摘要、定義名稱。相依：T003, T004
 - [ ] **T014 PPTX 讀取**：投影片、版面配置名稱、圖形樹（文字框/圖片/表格/圖表）、備忘稿、文字擷取。相依：T003, T004
