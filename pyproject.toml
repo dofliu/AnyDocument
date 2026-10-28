@@ -13,6 +13,7 @@ dependencies = [
     "typer>=0.12",  # MIT
     "pyyaml>=6",  # MIT
     "defusedxml>=0.7",  # PSF
+    "python-docx>=1.1",  # MIT
 ]
 
 [project.scripts]
@@ -26,6 +27,7 @@ json = "anydoc.formats.text:JsonHandler"
 yaml = "anydoc.formats.text:YamlHandler"
 xml = "anydoc.formats.text:XmlHandler"
 tsv = "anydoc.formats.csv:TsvHandler"
+docx = "anydoc.formats.docx:DocxHandler"
 
 [project.optional-dependencies]
 dev = [
@@ -36,7 +38,6 @@ dev = [
     "types-PyYAML",
     "types-defusedxml",
     # sample generation / library round-trip checks (all MIT/BSD/HPND)
-    "python-docx>=1.1",
     "openpyxl>=3.1",
     "python-pptx>=1.0",
     "reportlab>=4",
