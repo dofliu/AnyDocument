@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-28 | T013 XLSX 讀取 | ✅ 完成 | 305 passed | [報告](test-reports/2026-10-28_T013.md) | anydoc.formats.xlsx（XlsxHandler/XlsxDocument：工作表狀態與使用範圍、儲存格值/型別/公式/快取值、合併儲存格、樣式摘要、定義名稱、text()）；openpyxl 升為正式相依、dev 加 types-openpyxl；entry_points 註冊 xlsx；損毀檔案拋 CorruptFileError |
 | 2026-10-28 | T012 DOCX 讀取 | ✅ 完成 | 280 passed | [報告](test-reports/2026-10-28_T012.md) | anydoc.formats.docx（DocxHandler/DocxDocument：段落＋標題層級、表格、圖片清單、頁首頁尾、註腳（解析 footnotes.xml）、核心屬性、閱讀順序 text()）；python-docx 升為正式相依；以 entry_points 註冊 docx；損毀檔案統一拋 CorruptFileError |
 | 2026-10-28 | T011 Text 系列 Handler | ✅ 完成 | 255 passed | [報告](test-reports/2026-10-28_T011.md) | anydoc.formats.text（txt/markdown/json/yaml/xml；編碼與換行保留、Markdown 標題、XML 以 defusedxml 解析防 XXE/entity bomb、YAML safe_load）；新增相依 pyyaml、defusedxml；XML 非 expat 編碼（Big5）自動轉碼 |
 | 2026-10-27 | T010 CSV/TSV Handler | ✅ 完成 | 224 passed | [報告](test-reports/2026-10-27_T010.md) | anydoc.formats.csv（編碼 utf-8/BOM/big5/cp950/utf-16、分隔符號、型別推斷、往返保留編碼）；以 pyproject entry_points 註冊 csv/tsv；修正 CLI 測試不再假設 registry 僅含 fake handler；複查時修正 detect 對 ; / \| 分隔 .csv 誤判為 txt |

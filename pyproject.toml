@@ -14,6 +14,7 @@ dependencies = [
     "pyyaml>=6",  # MIT
     "defusedxml>=0.7",  # PSF
     "python-docx>=1.1",  # MIT
+    "openpyxl>=3.1",  # MIT
 ]
 
 [project.scripts]
@@ -28,6 +29,7 @@ yaml = "anydoc.formats.text:YamlHandler"
 xml = "anydoc.formats.text:XmlHandler"
 tsv = "anydoc.formats.csv:TsvHandler"
 docx = "anydoc.formats.docx:DocxHandler"
+xlsx = "anydoc.formats.xlsx:XlsxHandler"
 
 [project.optional-dependencies]
 dev = [
@@ -37,8 +39,8 @@ dev = [
     "mypy>=1.10",
     "types-PyYAML",
     "types-defusedxml",
+    "types-openpyxl",
     # sample generation / library round-trip checks (all MIT/BSD/HPND)
-    "openpyxl>=3.1",
     "python-pptx>=1.0",
     "reportlab>=4",
     "pypdf>=4",
