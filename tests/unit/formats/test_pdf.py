@@ -63,7 +63,7 @@ def test_entry_point_and_capabilities() -> None:
 
     eps = {ep.name: ep.value for ep in entry_points(group="anydoc.formats")}
     assert eps["pdf"] == "anydoc.formats.pdf:PdfHandler"
-    assert {Capability.READ, Capability.EXTRACT_TEXT} <= PdfHandler.capabilities
+    assert {Capability.READ, Capability.EXTRACT_TEXT, Capability.RENDER} <= PdfHandler.capabilities
 
 
 def test_sniff() -> None:

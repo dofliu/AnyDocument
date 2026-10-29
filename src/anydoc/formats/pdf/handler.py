@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import pdfplumber
+import pypdfium2
 from pypdf import PdfReader
 
 from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
@@ -146,6 +147,44 @@ class PdfDocument:
             )
         return out
 
+    def render_page(
+        self,
+        index: int,
+        *,
+        dpi: float = 72.0,
+        scale: float | None = None,
+        path: Path | None = None,
+    ) -> bytes:
+        """Render one page (0-based) to PNG with pypdfium2 and return the bytes.
+
+        The page's rotation is applied. ``scale`` (1.0 = 72 DPI) overrides ``dpi`` when given.
+        If ``path`` is given the PNG is also written there.
+        """
+        factor = scale if scale is not None else dpi / 72.0
+        if factor <= 0:
+            raise ValueError("dpi/scale must be positive")
+        self._require_unlocked()
+        try:
+            pdf = pypdfium2.PdfDocument(self._data, password=self._password or None)
+        except Exception as exc:
+            raise CorruptFileError(f"Cannot render PDF: {exc}") from exc
+        try:
+            if not 0 <= index < len(pdf):
+                raise IndexError(f"No such page: {index}")
+            page = pdf[index]
+            try:
+                image = page.render(scale=factor).to_pil()
+            finally:
+                page.close()
+        finally:
+            pdf.close()
+        buf = io.BytesIO()
+        image.save(buf, format="PNG", dpi=(factor * 72.0, factor * 72.0))
+        data = buf.getvalue()
+        if path is not None:
+            path.write_bytes(data)
+        return data
+
     # -- Document protocol -------------------------------------------------
 
     def _build_metadata(self) -> Metadata:
@@ -203,13 +242,13 @@ class PdfDocument:
 
 
 class PdfHandler(FormatHandler):
-    """Handler for ``.pdf`` documents (read-only for now; editing arrives in T040+)."""
+    """Handler for ``.pdf`` documents (read and render; editing arrives in T040+)."""
 
     format_id: ClassVar[str] = "pdf"
     extensions: ClassVar[tuple[str, ...]] = ("pdf",)
     mime_types: ClassVar[tuple[str, ...]] = (_PDF_MIME,)
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT}
+        {Capability.READ, Capability.EXTRACT_TEXT, Capability.RENDER}
     )
 
     @classmethod
