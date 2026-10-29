@@ -40,6 +40,9 @@ pdf = "anydoc.formats.pdf:PdfHandler"
 doc = "anydoc.formats.legacy:DocHandler"
 xls = "anydoc.formats.legacy:XlsHandler"
 ppt = "anydoc.formats.legacy:PptHandler"
+odt = "anydoc.formats.odf:OdtHandler"
+ods = "anydoc.formats.odf:OdsHandler"
+odp = "anydoc.formats.odf:OdpHandler"
 
 [project.optional-dependencies]
 dev = [
