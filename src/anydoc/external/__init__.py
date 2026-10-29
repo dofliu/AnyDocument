@@ -1,5 +1,6 @@
 """Detection and execution wrappers for optional external tools."""
 
+from anydoc.external.libreoffice import convert_with_libreoffice
 from anydoc.external.tools import (
     TOOLS,
     ExternalToolError,
@@ -19,6 +20,7 @@ __all__ = [
     "ExternalToolError",
     "ToolResult",
     "ToolSpec",
+    "convert_with_libreoffice",
     "available_tools",
     "find_tool",
     "is_available",

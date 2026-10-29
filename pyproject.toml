@@ -37,6 +37,9 @@ docx = "anydoc.formats.docx:DocxHandler"
 xlsx = "anydoc.formats.xlsx:XlsxHandler"
 pptx = "anydoc.formats.pptx:PptxHandler"
 pdf = "anydoc.formats.pdf:PdfHandler"
+doc = "anydoc.formats.legacy:DocHandler"
+xls = "anydoc.formats.legacy:XlsHandler"
+ppt = "anydoc.formats.legacy:PptHandler"
 
 [project.optional-dependencies]
 dev = [

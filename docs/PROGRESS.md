@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-29 | T017 舊版 DOC/XLS/PPT | ✅ 完成 | 381 passed | [報告](test-reports/2026-10-29_T017.md) | anydoc.formats.legacy（DocHandler/XlsHandler/PptHandler：LibreOffice 轉 OOXML 後委派 Docx/Xlsx/Pptx Handler，文件 format 回報 doc/xls/ppt 並與來源路徑脫鉤）；新增 external.convert_with_libreoffice（獨立 profile）；非 OLE2 內容拋 CorruptFileError；LibreOffice 缺少拋 ExternalToolMissingError；entry_points 註冊 doc/xls/ppt |
 | 2026-10-29 | T016 PDF 頁面渲染 | ✅ 完成 | 363 passed | [報告](test-reports/2026-10-29_T016.md) | PdfDocument.render_page(index, dpi=, scale=, path=)（pypdfium2 → PNG，套用頁面旋轉、加密 PDF 以密碼渲染）；PdfHandler 新增 RENDER 能力；pypdfium2、pillow 升為正式相依；mypy 對 pypdfium2 設 ignore_missing_imports；ruff format 檢查範圍同 CI（src tests） |
 | 2026-10-28 | T015 PDF 讀取 | ✅ 完成 | 349 passed | [報告](test-reports/2026-10-28_T015.md) | anydoc.formats.pdf（PdfHandler/PdfDocument：中繼資料、頁數、頁面尺寸/旋轉、page_text/words（含座標，pdfplumber）、images、加密狀態與密碼解鎖）；pypdf、pdfplumber 升為正式相依；修正 T004 PDF 樣本中文字型（STSong-Light/UniGB）；CLI/registry「無 handler」測試改用 dxf/png |
 | 2026-10-28 | T014 PPTX 讀取 | ✅ 完成 | 325 passed | [報告](test-reports/2026-10-28_T014.md) | anydoc.formats.pptx（PptxHandler/PptxDocument：投影片＋版面配置名稱、標題、圖形樹（文字框/圖片/表格/圖表/群組）、備忘稿、text()）；python-pptx 升為正式相依；entry_points 註冊 pptx；損毀檔案拋 CorruptFileError |
