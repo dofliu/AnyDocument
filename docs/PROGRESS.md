@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-29 | T019 DXF 讀取 | ✅ 完成 | 436 passed | [報告](test-reports/2026-10-29_T019.md) | anydoc.formats.dxf（DxfHandler/DxfDocument：版本/release、單位、圖層（顏色/線型/開關/凍結/鎖定）、圖元統計與清單、圖塊、配置、TEXT/MTEXT/ATTRIB 文字擷取；ezdxf 升為正式相依；唯讀，save 以 ezdxf 寫回）；entry_points 註冊 dxf；CLI test_info_no_handler 改用 png 樣本 |
 | 2026-10-29 | T018 ODF（ODT/ODS/ODP） | ✅ 完成 | 419 passed | [報告](test-reports/2026-10-29_T018.md) | anydoc.formats.odf（OdtHandler/OdsHandler/OdpHandler：defusedxml 直接解析 content.xml/meta.xml，無新增相依；ODT 區塊/標題/清單/表格/圖片、ODS 工作表/儲存格型別/公式/重複列欄、ODP 投影片/版面/圖形/備忘稿；唯讀，save 寫回原封包）；entry_points 註冊 odt/ods/odp |
 | 2026-10-29 | T017 舊版 DOC/XLS/PPT | ✅ 完成 | 381 passed | [報告](test-reports/2026-10-29_T017.md) | anydoc.formats.legacy（DocHandler/XlsHandler/PptHandler：LibreOffice 轉 OOXML 後委派 Docx/Xlsx/Pptx Handler，文件 format 回報 doc/xls/ppt 並與來源路徑脫鉤）；新增 external.convert_with_libreoffice（獨立 profile）；非 OLE2 內容拋 CorruptFileError；LibreOffice 缺少拋 ExternalToolMissingError；entry_points 註冊 doc/xls/ppt |
 | 2026-10-29 | T016 PDF 頁面渲染 | ✅ 完成 | 363 passed | [報告](test-reports/2026-10-29_T016.md) | PdfDocument.render_page(index, dpi=, scale=, path=)（pypdfium2 → PNG，套用頁面旋轉、加密 PDF 以密碼渲染）；PdfHandler 新增 RENDER 能力；pypdfium2、pillow 升為正式相依；mypy 對 pypdfium2 設 ignore_missing_imports；ruff format 檢查範圍同 CI（src tests） |

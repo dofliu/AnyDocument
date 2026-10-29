@@ -63,7 +63,7 @@
 - [x] **T016 PDF 頁面渲染**：pypdfium2 渲染指定頁為 PNG（DPI、縮放），回傳 bytes/儲存。相依：T015
 - [x] **T017 舊版 DOC/XLS/PPT**：透過 LibreOffice 轉為 OOXML 後交給對應 Handler；工具不存在時拋 `ExternalToolMissingError`。相依：T007, T012, T013, T014
 - [x] **T018 ODF（ODT/ODS/ODP）**：讀取（odfpy 或直接解析 XML）文字/表格/投影片結構。相依：T003
-- [ ] **T019 DXF 讀取**：版本、單位、圖層（顏色/線型/開關）、圖元統計與清單、圖塊、配置 (layouts)、文字擷取（TEXT/MTEXT/屬性）。相依：T003, T004
+- [x] **T019 DXF 讀取**：版本、單位、圖層（顏色/線型/開關）、圖元統計與清單、圖塊、配置 (layouts)、文字擷取（TEXT/MTEXT/屬性）。相依：T003, T004
 - [ ] **T020 DXF 渲染**：ezdxf drawing addon 輸出 SVG、PNG、PDF；可指定配置與圖層。相依：T019
 - [ ] **T021 DWG 支援**：偵測 DWG 版本；透過 ODA File Converter 或 LibreDWG 轉 DXF 後開啟；工具不存在時優雅降級（僅回傳版本中繼資料）。相依：T007, T019
 - [ ] **T022 影像 Handler**：PNG/JPG/TIFF(多頁)/BMP/WebP/GIF/SVG；中繼資料、EXIF、縮放、旋轉、格式轉換。相依：T003, T004
