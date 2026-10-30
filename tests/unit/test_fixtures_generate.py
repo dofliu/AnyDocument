@@ -127,6 +127,9 @@ def test_dxf(sample: Sample) -> None:
         ("csv-big5", "csv"),
         ("json", "json"),
         ("txt", "txt"),
+        ("rtf", "rtf"),
+        ("html", "html"),
+        ("epub", "epub"),
     ],
 )
 def test_samples_detected(sample: Sample, fmt: str, expected: str) -> None:

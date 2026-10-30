@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-30 | T023 RTF/HTML/EPUB 讀取 | ✅ 完成 | 533 passed, 1 skipped | [報告](test-reports/2026-10-30_T023.md) | anydoc.formats.markup（RtfHandler：狀態機解析 \\uN/\\'hh 代碼頁、略過 fonttbl/info 等目的地、\\info 標題作者；HtmlHandler：html.parser 擷取標題/連結/圖片/表格/閱讀順序文字、meta charset 編碼；EpubHandler：OPF 中繼資料、spine 章節、defusedxml；皆唯讀，save 寫回原始位元組）；entry_points 註冊 rtf/html/epub；樣本產生器新增三種；CLI/registry「無 handler」測試改以隔離 registry |
 | 2026-10-30 | T022 影像 Handler | ✅ 完成 | 497 passed, 1 skipped | [報告](test-reports/2026-10-30_T022.md) | anydoc.formats.image（ImageDocument/Png·Jpeg·Gif·Bmp·Webp·Tiff Handler：Pillow 開啟、尺寸/模式/DPI、EXIF、多頁 TIFF/GIF 幀、resize/rotate/convert/save；SvgHandler：defusedxml 解析尺寸/viewBox/文字，唯讀）；entry_points 註冊 7 種；registry/CLI「無 handler」測試改用 rtf |
 | 2026-10-30 | T021 DWG 支援 | ✅ 完成 | 460 passed, 1 skipped | [報告](test-reports/2026-10-30_T021.md) | anydoc.formats.dwg（DwgHandler/DwgDocument：AC10xx 版本→發行版、ODA/LibreDWG 轉 DXF 後以 .dxf 暴露 DxfDocument API；無轉換器時僅回傳版本中繼資料）；新增 external.dwg.convert_dwg_to_dxf（ODA 優先、LibreDWG 後備）；entry_points 註冊 dwg；轉換流程以假 runner 測試，真實工具測試 skip |
 | 2026-10-30 | T020 DXF 渲染 | ✅ 完成 | 445 passed | [報告](test-reports/2026-10-30_T020.md) | DxfDocument.render(fmt, layout=, layers=, dpi=, path=)：svg 用 ezdxf SVGBackend、png/pdf 用 MatplotlibBackend；DxfHandler 新增 RENDER 能力；matplotlib 升為正式相依；全被過濾/無面積圖面 SVG 回傳空白 SVG |

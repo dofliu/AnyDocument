@@ -134,7 +134,10 @@ def test_info_ok(sample: Callable[[str], Path]) -> None:
     assert data["parts"][0]["name"] == "第一頁"
 
 
-def test_info_no_handler(tmp_path: Path) -> None:
+def test_info_no_handler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # every detectable format now has a handler; simulate a missing one
+    monkeypatch.setattr(registry, "_handlers", {})
+    monkeypatch.setattr("anydoc.core.registry.entry_points", lambda group: [])
     rtf = tmp_path / "a.rtf"
     rtf.write_text("{\\rtf1\\ansi hello}", encoding="ascii")
     result = runner.invoke(app, ["info", str(rtf)])

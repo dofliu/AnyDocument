@@ -29,6 +29,12 @@ class OtherHandler(FakeHandler):
     extensions: ClassVar[tuple[str, ...]] = ("fk",)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_global_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Start each test with an empty global registry (restored afterwards)."""
+    monkeypatch.setattr(registry, "_handlers", {})
+
+
 def test_register_and_lookup() -> None:
     reg = HandlerRegistry()
     assert reg.register(FakeHandler) is FakeHandler

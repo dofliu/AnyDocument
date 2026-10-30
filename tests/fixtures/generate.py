@@ -169,6 +169,69 @@ def make_dxf() -> bytes:
     return stream.getvalue().encode("utf-8")
 
 
+def make_rtf() -> bytes:
+    """Return an RTF sample (CJK text via ``\\uN`` escapes) with an info block."""
+
+    def esc(text: str) -> str:
+        return "".join(f"\\u{ord(c)}?" if ord(c) > 127 else c for c in text)
+
+    return (
+        "{\\rtf1\\ansi\\ansicpg950\\deff0{\\fonttbl{\\f0 Arial;}}"
+        f"{{\\info{{\\title {esc(TITLE)}}}{{\\author Doflab}}}}"
+        f"\\pard {esc(TITLE)}\\par {esc(BODY)}\\par}}"
+    ).encode("ascii")
+
+
+def make_html() -> bytes:
+    """Return an HTML sample with headings, a link, an image and a table."""
+    return (
+        '<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">'
+        f'<title>{TITLE}</title><meta name="author" content="Doflab">'
+        "<style>p{color:red}</style></head><body>"
+        f'<h1>{TITLE}</h1><p>{BODY}</p><a href="https://example.com">連結</a>'
+        '<img src="a.png" alt="圖"><table><tr><th>名稱</th><th>數量</th></tr>'
+        "<tr><td>蘋果</td><td>3</td></tr></table>"
+        "<script>var x = 1;</script></body></html>"
+    ).encode()
+
+
+def make_epub() -> bytes:
+    """Return a minimal two-chapter EPUB 3 package."""
+    import zipfile
+
+    def chapter(title: str, body: str) -> str:
+        return (
+            '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+            f"<head><title>{title}</title></head><body><h1>{title}</h1><p>{body}</p></body></html>"
+        )
+
+    opf = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">'
+        '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        f"<dc:title>{TITLE}</dc:title><dc:creator>Doflab</dc:creator>"
+        '<dc:language>zh-TW</dc:language><dc:identifier id="id">urn:test:1</dc:identifier>'
+        "</metadata><manifest>"
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>'
+        '<item id="c2" href="ch2.xhtml" media-type="application/xhtml+xml"/>'
+        '</manifest><spine><itemref idref="c1"/><itemref idref="c2"/></spine></package>'
+    )
+    container = (
+        '<?xml version="1.0"?><container version="1.0" '
+        'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+        '<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>'
+        "</rootfiles></container>"
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        zf.writestr("META-INF/container.xml", container)
+        zf.writestr("OEBPS/content.opf", opf)
+        zf.writestr("OEBPS/ch1.xhtml", chapter("第一章", BODY))
+        zf.writestr("OEBPS/ch2.xhtml", chapter("第二章", "結尾"))
+    return buf.getvalue()
+
+
 #: Sample id -> (file name, generator).  ``sample(fmt)`` accepts these ids.
 SAMPLES: dict[str, tuple[str, Callable[[], bytes]]] = {
     "txt": ("sample.txt", make_txt),
@@ -183,6 +246,9 @@ SAMPLES: dict[str, tuple[str, Callable[[], bytes]]] = {
     "pptx": ("sample.pptx", make_pptx),
     "pdf": ("sample.pdf", make_pdf),
     "dxf": ("sample.dxf", make_dxf),
+    "rtf": ("sample.rtf", make_rtf),
+    "html": ("sample.html", make_html),
+    "epub": ("sample.epub", make_epub),
 }
 
 

@@ -135,7 +135,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 舊版 DOC / XLS / PPT（經 LibreOffice 轉換） | P1 | ✅ | T017 |
 | ODT / ODS / ODP | P1 | 🟨 | T018（讀取完成） |
 | 影像：中繼資料、EXIF、縮放、格式轉換 | P1 | ✅ | T022 |
-| RTF / HTML / EPUB 讀取 | P2 | ⬜ | T023 |
+| RTF / HTML / EPUB 讀取 | P2 | ✅ | T023 |
 
 ### 5.8 跨格式功能
 | 功能 | 優先級 | 狀態 | Roadmap |

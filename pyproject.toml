@@ -54,6 +54,9 @@ bmp = "anydoc.formats.image:BmpHandler"
 webp = "anydoc.formats.image:WebpHandler"
 tiff = "anydoc.formats.image:TiffHandler"
 svg = "anydoc.formats.image:SvgHandler"
+rtf = "anydoc.formats.markup:RtfHandler"
+html = "anydoc.formats.markup:HtmlHandler"
+epub = "anydoc.formats.markup:EpubHandler"
 
 [project.optional-dependencies]
 dev = [

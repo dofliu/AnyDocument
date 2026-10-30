@@ -67,7 +67,7 @@
 - [x] **T020 DXF 渲染**：ezdxf drawing addon 輸出 SVG、PNG、PDF；可指定配置與圖層。相依：T019
 - [x] **T021 DWG 支援**：偵測 DWG 版本；透過 ODA File Converter 或 LibreDWG 轉 DXF 後開啟；工具不存在時優雅降級（僅回傳版本中繼資料）。相依：T007, T019
 - [x] **T022 影像 Handler**：PNG/JPG/TIFF(多頁)/BMP/WebP/GIF/SVG；中繼資料、EXIF、縮放、旋轉、格式轉換。相依：T003, T004
-- [ ] **T023 RTF/HTML/EPUB 讀取**：文字與結構擷取。相依：T003
+- [x] **T023 RTF/HTML/EPUB 讀取**：文字與結構擷取。相依：T003
 
 ## Phase 2 — 統一 API 與轉換
 
