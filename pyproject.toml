@@ -46,6 +46,7 @@ odt = "anydoc.formats.odf:OdtHandler"
 ods = "anydoc.formats.odf:OdsHandler"
 odp = "anydoc.formats.odf:OdpHandler"
 dxf = "anydoc.formats.dxf:DxfHandler"
+dwg = "anydoc.formats.dwg:DwgHandler"
 
 [project.optional-dependencies]
 dev = [

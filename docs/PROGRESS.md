@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-30 | T021 DWG 支援 | ✅ 完成 | 460 passed, 1 skipped | [報告](test-reports/2026-10-30_T021.md) | anydoc.formats.dwg（DwgHandler/DwgDocument：AC10xx 版本→發行版、ODA/LibreDWG 轉 DXF 後以 .dxf 暴露 DxfDocument API；無轉換器時僅回傳版本中繼資料）；新增 external.dwg.convert_dwg_to_dxf（ODA 優先、LibreDWG 後備）；entry_points 註冊 dwg；轉換流程以假 runner 測試，真實工具測試 skip |
 | 2026-10-30 | T020 DXF 渲染 | ✅ 完成 | 445 passed | [報告](test-reports/2026-10-30_T020.md) | DxfDocument.render(fmt, layout=, layers=, dpi=, path=)：svg 用 ezdxf SVGBackend、png/pdf 用 MatplotlibBackend；DxfHandler 新增 RENDER 能力；matplotlib 升為正式相依；全被過濾/無面積圖面 SVG 回傳空白 SVG |
 | 2026-10-29 | T019 DXF 讀取 | ✅ 完成 | 436 passed | [報告](test-reports/2026-10-29_T019.md) | anydoc.formats.dxf（DxfHandler/DxfDocument：版本/release、單位、圖層（顏色/線型/開關/凍結/鎖定）、圖元統計與清單、圖塊、配置、TEXT/MTEXT/ATTRIB 文字擷取；ezdxf 升為正式相依；唯讀，save 以 ezdxf 寫回）；entry_points 註冊 dxf；CLI test_info_no_handler 改用 png 樣本 |
 | 2026-10-29 | T018 ODF（ODT/ODS/ODP） | ✅ 完成 | 419 passed | [報告](test-reports/2026-10-29_T018.md) | anydoc.formats.odf（OdtHandler/OdsHandler/OdpHandler：defusedxml 直接解析 content.xml/meta.xml，無新增相依；ODT 區塊/標題/清單/表格/圖片、ODS 工作表/儲存格型別/公式/重複列欄、ODP 投影片/版面/圖形/備忘稿；唯讀，save 寫回原封包）；entry_points 註冊 odt/ods/odp |

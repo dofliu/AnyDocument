@@ -1,5 +1,6 @@
 """Detection and execution wrappers for optional external tools."""
 
+from anydoc.external.dwg import available_dwg_converter, convert_dwg_to_dxf
 from anydoc.external.libreoffice import convert_with_libreoffice
 from anydoc.external.tools import (
     TOOLS,
@@ -20,6 +21,8 @@ __all__ = [
     "ExternalToolError",
     "ToolResult",
     "ToolSpec",
+    "available_dwg_converter",
+    "convert_dwg_to_dxf",
     "convert_with_libreoffice",
     "available_tools",
     "find_tool",
