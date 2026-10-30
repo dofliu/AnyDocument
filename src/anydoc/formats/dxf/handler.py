@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from collections import Counter
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
@@ -14,6 +15,7 @@ from ezdxf import units as dxf_units
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.dxf.render import render_layout
 
 _DXF_MIME = "image/vnd.dxf"
 
@@ -182,6 +184,27 @@ class DxfDocument:
                         items.append(TextItem("ATTRIB", att.dxf.text, att.dxf.layer, name))
         return [t for t in items if t.text]
 
+    # -- rendering ---------------------------------------------------------
+
+    def render(
+        self,
+        fmt: str = "svg",
+        *,
+        layout: str = "Model",
+        layers: Collection[str] | None = None,
+        dpi: float = 150.0,
+        path: Path | None = None,
+    ) -> bytes:
+        """Render a layout to ``svg``, ``png`` or ``pdf`` and return the bytes.
+
+        ``layers`` limits output to those layer names; ``dpi`` applies to PNG. If ``path``
+        is given the bytes are also written there.
+        """
+        data = render_layout(self._doc, fmt, layout_name=layout, layers=layers, dpi=dpi)
+        if path is not None:
+            path.write_bytes(data)
+        return data
+
     # -- Document protocol -------------------------------------------------
 
     def _build_metadata(self) -> Metadata:
@@ -230,7 +253,7 @@ class DxfHandler(FormatHandler):
     extensions: ClassVar[tuple[str, ...]] = ("dxf",)
     mime_types: ClassVar[tuple[str, ...]] = (_DXF_MIME, "application/dxf")
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT}
+        {Capability.READ, Capability.EXTRACT_TEXT, Capability.RENDER}
     )
 
     @classmethod
