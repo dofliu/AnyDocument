@@ -47,6 +47,13 @@ ods = "anydoc.formats.odf:OdsHandler"
 odp = "anydoc.formats.odf:OdpHandler"
 dxf = "anydoc.formats.dxf:DxfHandler"
 dwg = "anydoc.formats.dwg:DwgHandler"
+png = "anydoc.formats.image:PngHandler"
+jpeg = "anydoc.formats.image:JpegHandler"
+gif = "anydoc.formats.image:GifHandler"
+bmp = "anydoc.formats.image:BmpHandler"
+webp = "anydoc.formats.image:WebpHandler"
+tiff = "anydoc.formats.image:TiffHandler"
+svg = "anydoc.formats.image:SvgHandler"
 
 [project.optional-dependencies]
 dev = [

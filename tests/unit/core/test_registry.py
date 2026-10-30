@@ -90,26 +90,26 @@ def test_load_entry_points() -> None:
 def test_open_dispatches_to_registered_handler(tmp_path: Path) -> None:
     sentinel = MagicMock()
 
-    class PngHandler(FakeHandler):
-        format_id: ClassVar[str] = "png"
+    class RtfHandler(FakeHandler):
+        format_id: ClassVar[str] = "rtf"
 
         def open(self, source: Path | bytes) -> Document:
             sentinel.source = source
             return sentinel  # type: ignore[no-any-return]
 
-    f = tmp_path / "a.png"
-    f.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 20)
-    registry.register(PngHandler)
+    f = tmp_path / "a.rtf"
+    f.write_bytes(b"{\\rtf1\\ansi hello}")
+    registry.register(RtfHandler)
     try:
         assert anydoc.open(f) is sentinel
         assert sentinel.source == f
     finally:
-        registry.unregister("png")
+        registry.unregister("rtf")
 
 
 def test_open_without_handler_raises(tmp_path: Path) -> None:
-    f = tmp_path / "a.png"
-    f.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 20)
+    f = tmp_path / "a.rtf"
+    f.write_bytes(b"{\\rtf1\\ansi hello}")
     with (
         patch("anydoc.core.registry.entry_points", return_value=[]),
         pytest.raises(UnsupportedFormatError),
@@ -120,18 +120,18 @@ def test_open_without_handler_raises(tmp_path: Path) -> None:
 def test_open_loads_entry_point_handlers(tmp_path: Path) -> None:
     sentinel = MagicMock()
 
-    class PngEpHandler(FakeHandler):
-        format_id: ClassVar[str] = "png"
+    class RtfEpHandler(FakeHandler):
+        format_id: ClassVar[str] = "rtf"
 
         def open(self, source: Path | bytes) -> Document:
             return sentinel  # type: ignore[no-any-return]
 
     ep = MagicMock()
-    ep.load.return_value = PngEpHandler
-    f = tmp_path / "a.png"
-    f.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 20)
+    ep.load.return_value = RtfEpHandler
+    f = tmp_path / "a.rtf"
+    f.write_bytes(b"{\\rtf1\\ansi hello}")
     try:
         with patch("anydoc.core.registry.entry_points", return_value=[ep]):
             assert anydoc.open(f) is sentinel
     finally:
-        registry.unregister("png")
+        registry.unregister("rtf")

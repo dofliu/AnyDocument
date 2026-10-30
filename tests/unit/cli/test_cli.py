@@ -134,8 +134,10 @@ def test_info_ok(sample: Callable[[str], Path]) -> None:
     assert data["parts"][0]["name"] == "第一頁"
 
 
-def test_info_no_handler(sample: Callable[[str], Path]) -> None:
-    result = runner.invoke(app, ["info", str(sample("png"))])
+def test_info_no_handler(tmp_path: Path) -> None:
+    rtf = tmp_path / "a.rtf"
+    rtf.write_text("{\\rtf1\\ansi hello}", encoding="ascii")
+    result = runner.invoke(app, ["info", str(rtf)])
     assert result.exit_code == 1
     assert "No handler" in result.output
 
