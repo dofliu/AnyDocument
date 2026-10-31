@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-10-31 | T032 Office/ODF → PDF | ✅ 完成 | 590 passed, 1 skipped | [報告](test-reports/2026-10-31_T032.md) | anydoc.converters.office_pdf（docx/doc/odt/rtf/xlsx/xls/ods/pptx/ppt/odp → pdf，LibreOffice headless、requires=libreoffice、cost 2；來源暫存為正確副檔名以選對輸入過濾器）；anydoc.converters.load_builtin_converters 於 `anydoc.convert()` 首次使用時註冊至全域 graph；缺 LibreOffice 時回報 ConversionPathError 並提示工具 |
 | 2026-10-31 | T031 轉換圖引擎 | ✅ 完成 | 576 passed, 1 skipped | [報告](test-reports/2026-10-31_T031.md) | anydoc.core.convert（Converter/ConversionGraph：Dijkstra 最低成本路徑、略過缺少外部工具的邊並於錯誤訊息提示缺少的工具、多步轉換鏈以暫存目錄串接；全域 `graph` 供 T032+ 註冊轉換器）；`anydoc.convert(src, dst)`（來源內容偵測、目標依副檔名）與 CLI `anydoc convert IN OUT`；引擎尚無實際轉換器 |
 | 2026-10-31 | T030 統一文字擷取 API | ✅ 完成 | 558 passed, 1 skipped | [報告](test-reports/2026-10-31_T030.md) | anydoc.extract_text(path)（open→text()→close）；CLI `anydoc text FILE [-o OUT]`；整合測試涵蓋 13 種樣本（txt/json/csv×3/docx/xlsx/pptx/pdf/dxf/rtf/html/epub）與錯誤結束碼 |
 | 2026-10-30 | T023 RTF/HTML/EPUB 讀取 | ✅ 完成 | 533 passed, 1 skipped | [報告](test-reports/2026-10-30_T023.md) | anydoc.formats.markup（RtfHandler：狀態機解析 \\uN/\\'hh 代碼頁、略過 fonttbl/info 等目的地、\\info 標題作者；HtmlHandler：html.parser 擷取標題/連結/圖片/表格/閱讀順序文字、meta charset 編碼；EpubHandler：OPF 中繼資料、spine 章節、defusedxml；皆唯讀，save 寫回原始位元組）；entry_points 註冊 rtf/html/epub；樣本產生器新增三種；CLI/registry「無 handler」測試改以隔離 registry |

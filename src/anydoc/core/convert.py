@@ -180,6 +180,10 @@ def convert(src: str | Path, dst: str | Path, *, graph_: ConversionGraph | None 
     from anydoc.core.detect import detect
     from anydoc.core.registry import registry
 
+    if graph_ is None:
+        from anydoc.converters import load_builtin_converters
+
+        load_builtin_converters()
     g = graph_ or graph
     src_p, dst_p = Path(src), Path(dst)
     src_format = detect(src_p).format

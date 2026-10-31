@@ -77,7 +77,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 追蹤修訂與註解（讀取/接受/拒絕） | P2 | ⬜ | T055 |
 | 合併列印 (Mail Merge) | P1 | ⬜ | T056 |
 | 清單（項目符號/編號） | P1 | ⬜ | T050 |
-| 匯出 PDF / HTML / Markdown | P0 | ⬜ | T032, T034 |
+| 匯出 PDF / HTML / Markdown | P0 | 🟨 | T032（PDF 完成）, T034 |
 
 ### 5.3 Excel / XLSX（對照 Microsoft Excel）
 | 功能 | 優先級 | 狀態 | Roadmap |
@@ -93,7 +93,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 資料驗證 | P2 | ⬜ | T065 |
 | 樞紐分析 | P2 | ⬜ | T066 |
 | 凍結窗格、欄寬列高、隱藏 | P2 | ⬜ | T062 |
-| 匯出 CSV / JSON / PDF | P0 | ⬜ | T035, T032 |
+| 匯出 CSV / JSON / PDF | P0 | 🟨 | T035, T032（PDF 完成） |
 
 ### 5.4 PowerPoint / PPTX（對照 Microsoft PowerPoint）
 | 功能 | 優先級 | 狀態 | Roadmap |
@@ -105,7 +105,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 表格與圖表 | P1 | ⬜ | T072 |
 | 版面配置 / 母片套用 | P2 | ⬜ | T073 |
 | 備忘稿編輯 | P1 | ⬜ | T070 |
-| 匯出 PDF / 影像 | P0 | ⬜ | T032, T036 |
+| 匯出 PDF / 影像 | P0 | 🟨 | T032（PDF 完成）, T036 |
 
 ### 5.5 CSV / TSV
 | 功能 | 優先級 | 狀態 | Roadmap |
@@ -142,7 +142,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 |------|------|------|------|
 | 格式自動辨識 | P0 | ✅ | T003 |
 | 統一文字擷取 | P0 | ✅ | T030 |
-| 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成；轉換器 T032–T035） |
+| 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成）、T032（Office/ODF→PDF）；T033–T035 待做 |
 | 縮圖 | P1 | ⬜ | T036 |
 | 全文搜尋 | P2 | ⬜ | T090 |
 | 文件比較 (diff) | P2 | ⬜ | T091 |
