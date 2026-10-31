@@ -11,7 +11,7 @@ from anydoc.core.registry import registry
 
 __version__ = "0.1.0"
 
-__all__ = ["Detection", "__version__", "detect", "extract_text", "open"]
+__all__ = ["Detection", "__version__", "convert", "detect", "extract_text", "open"]
 
 
 def open(path: str | Path) -> Document:  # noqa: A001
@@ -43,3 +43,10 @@ def extract_text(path: str | Path) -> str:
         return doc.text()
     finally:
         doc.close()
+
+
+def convert(src: str | Path, dst: str | Path) -> Path:
+    """Convert ``src`` to the format implied by ``dst``'s extension; see ``core.convert``."""
+    from anydoc.core.convert import convert as _convert
+
+    return _convert(src, dst)

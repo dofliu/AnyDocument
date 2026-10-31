@@ -135,6 +135,23 @@ def text(
     typer.echo(content)
 
 
+@app.command()
+def convert(
+    source: Annotated[Path, typer.Argument(help="Input document.")],
+    target: Annotated[Path, typer.Argument(help="Output path; its extension selects the format.")],
+) -> None:
+    """Convert a document to another format (target inferred from the output extension)."""
+    from anydoc.core.convert import convert as convert_file
+
+    try:
+        convert_file(source, target)
+    except FileNotFoundError:
+        raise _fail(f"file not found: {source}", 2) from None
+    except AnyDocError as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(target))
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
