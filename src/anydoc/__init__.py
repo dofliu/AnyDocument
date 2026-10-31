@@ -11,7 +11,7 @@ from anydoc.core.registry import registry
 
 __version__ = "0.1.0"
 
-__all__ = ["Detection", "__version__", "detect", "open"]
+__all__ = ["Detection", "__version__", "detect", "extract_text", "open"]
 
 
 def open(path: str | Path) -> Document:  # noqa: A001
@@ -29,3 +29,17 @@ def open(path: str | Path) -> Document:  # noqa: A001
     if handler is None:
         raise UnsupportedFormatError(f"No handler registered for format: {detection.format}")
     return handler().open(p)
+
+
+def extract_text(path: str | Path) -> str:
+    """Open ``path`` with its handler, return its text in reading order and close it.
+
+    Raises:
+        UnsupportedFormatError: if the format is unknown or no handler is registered for it.
+        FileNotFoundError: if ``path`` does not exist.
+    """
+    doc = open(path)
+    try:
+        return doc.text()
+    finally:
+        doc.close()

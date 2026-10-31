@@ -112,6 +112,29 @@ def info(file: FileArg) -> None:
     _dump(payload)
 
 
+@app.command()
+def text(
+    file: FileArg,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Write the text to this UTF-8 file instead of stdout."),
+    ] = None,
+) -> None:
+    """Extract a document's text in reading order."""
+    from anydoc import extract_text
+
+    try:
+        content = extract_text(file)
+    except FileNotFoundError:
+        raise _fail(f"file not found: {file}", 2) from None
+    except AnyDocError as exc:
+        raise _fail(str(exc)) from None
+    if output is not None:
+        output.write_text(content, encoding="utf-8")
+        return
+    typer.echo(content)
+
+
 def main() -> None:
     """Console-script entry point."""
     app()

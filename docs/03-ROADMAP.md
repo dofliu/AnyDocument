@@ -71,7 +71,7 @@
 
 ## Phase 2 — 統一 API 與轉換
 
-- [ ] **T030 統一文字擷取 API**：`anydoc.extract_text(path)` 與 CLI `anydoc text`；所有已完成 Handler 的整合測試。相依：T010–T016, T019
+- [x] **T030 統一文字擷取 API**：`anydoc.extract_text(path)` 與 CLI `anydoc text`；所有已完成 Handler 的整合測試。相依：T010–T016, T019
 - [ ] **T031 轉換圖引擎**：`ConversionGraph`、Dijkstra 路徑、略過缺少外部工具的邊；CLI `anydoc convert in out`。相依：T003, T007
 - [ ] **T032 Office/ODF → PDF**：LibreOffice headless 轉換器註冊進轉換圖。相依：T031
 - [ ] **T033 PDF ↔ 影像**：PDF→PNG（每頁）、影像→PDF（多張合一）。相依：T016, T022, T031
