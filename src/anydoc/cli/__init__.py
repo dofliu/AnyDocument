@@ -152,6 +152,25 @@ def convert(
     typer.echo(str(target))
 
 
+@app.command()
+def thumbnail(
+    source: Annotated[Path, typer.Argument(help="Input document.")],
+    target: Annotated[Path, typer.Argument(help="Output image (.png, .jpg or .webp).")],
+    size: Annotated[int, typer.Option("--size", "-s", help="Longest side in pixels.")] = 256,
+    page: Annotated[int, typer.Option("--page", "-p", help="0-based page/slide/layout.")] = 0,
+) -> None:
+    """Create a thumbnail image of a document."""
+    from anydoc import thumbnail as make
+
+    try:
+        make(source, target, size=size, page=page)
+    except FileNotFoundError:
+        raise _fail(f"file not found: {source}", 2) from None
+    except (AnyDocError, ValueError, IndexError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(target))
+
+
 def main() -> None:
     """Console-script entry point."""
     app()

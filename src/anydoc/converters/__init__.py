@@ -27,10 +27,12 @@ from anydoc.converters.tabular import (
     xlsx_to_csv_files,
     xlsx_to_json,
 )
+from anydoc.converters.thumbnail import THUMBNAIL_FORMATS, make_thumbnail, render_preview
 
 __all__ = [
     "IMAGE_FORMATS",
     "OFFICE_PDF_SOURCES",
+    "THUMBNAIL_FORMATS",
     "csv_to_csv",
     "csv_to_json",
     "csv_to_xlsx",
@@ -41,12 +43,14 @@ __all__ = [
     "json_to_csv",
     "json_to_xlsx",
     "load_builtin_converters",
+    "make_thumbnail",
     "markdown_to_docx",
     "pdf_to_images",
     "register_docx_text",
     "register_office_pdf",
     "register_pdf_image",
     "register_tabular",
+    "render_preview",
     "xlsx_to_csv",
     "xlsx_to_csv_files",
     "xlsx_to_json",

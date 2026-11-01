@@ -11,7 +11,7 @@ from anydoc.core.registry import registry
 
 __version__ = "0.1.0"
 
-__all__ = ["Detection", "__version__", "convert", "detect", "extract_text", "open"]
+__all__ = ["Detection", "__version__", "convert", "detect", "extract_text", "open", "thumbnail"]
 
 
 def open(path: str | Path) -> Document:  # noqa: A001
@@ -50,3 +50,17 @@ def convert(src: str | Path, dst: str | Path) -> Path:
     from anydoc.core.convert import convert as _convert
 
     return _convert(src, dst)
+
+
+def thumbnail(
+    path: str | Path,
+    out: str | Path | None = None,
+    *,
+    size: int = 256,
+    fmt: str | None = None,
+    page: int = 0,
+) -> bytes:
+    """Create a PNG/JPEG/WebP thumbnail of any supported document; see ``make_thumbnail``."""
+    from anydoc.converters.thumbnail import make_thumbnail
+
+    return make_thumbnail(path, out, size=size, fmt=fmt, page=page)
