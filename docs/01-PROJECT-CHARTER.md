@@ -77,7 +77,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 追蹤修訂與註解（讀取/接受/拒絕） | P2 | ⬜ | T055 |
 | 合併列印 (Mail Merge) | P1 | ⬜ | T056 |
 | 清單（項目符號/編號） | P1 | ⬜ | T050 |
-| 匯出 PDF / HTML / Markdown | P0 | 🟨 | T032（PDF 完成）, T034 |
+| 匯出 PDF / HTML / Markdown | P0 | 🟨 | T032（PDF 完成）, T034（Markdown/HTML 完成）|
 
 ### 5.3 Excel / XLSX（對照 Microsoft Excel）
 | 功能 | 優先級 | 狀態 | Roadmap |
@@ -142,7 +142,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 |------|------|------|------|
 | 格式自動辨識 | P0 | ✅ | T003 |
 | 統一文字擷取 | P0 | ✅ | T030 |
-| 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成）、T032（Office/ODF→PDF）、T033（PDF↔影像）；T034–T035 待做 |
+| 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成）、T032（Office/ODF→PDF）、T033（PDF↔影像）、T034（DOCX↔Markdown/HTML）；T035 待做 |
 | 縮圖 | P1 | ⬜ | T036 |
 | 全文搜尋 | P2 | ⬜ | T090 |
 | 文件比較 (diff) | P2 | ⬜ | T091 |
