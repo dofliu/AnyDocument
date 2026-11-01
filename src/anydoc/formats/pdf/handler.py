@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ from pypdf import PdfReader
 from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.pdf import pages as pages_ops
 
 _PDF_MIME = "application/pdf"
 
@@ -185,6 +187,63 @@ class PdfDocument:
             path.write_bytes(data)
         return data
 
+    # -- page editing (T040) -----------------------------------------------
+
+    def _apply(self, data: bytes) -> None:
+        """Replace the document bytes and refresh every cached view of them."""
+        if self._plumber is not None:
+            self._plumber.close()
+            self._plumber = None
+        self._data = data
+        self._reader = PdfReader(io.BytesIO(data))
+        if self._reader.is_encrypted:
+            self._reader.decrypt(self._password)
+        self.metadata = self._build_metadata()
+
+    def _edit_source(self) -> bytes:
+        self._require_unlocked()
+        if self.is_encrypted:
+            raise OperationNotSupportedError("Editing encrypted PDFs is not supported yet")
+        return self._data
+
+    def merge(self, *others: PdfDocument | bytes | Path) -> None:
+        """Append the pages of other PDFs (documents, bytes or paths) to this document."""
+        blobs = [self._edit_source()]
+        for o in others:
+            if isinstance(o, PdfDocument):
+                blobs.append(o._edit_source())
+            elif isinstance(o, Path):
+                blobs.append(o.read_bytes())
+            else:
+                blobs.append(o)
+        self._apply(pages_ops.merge_pdfs(blobs))
+
+    def extract_pages(self, pages: Sequence[int]) -> bytes:
+        """Return a new PDF (bytes) with the given 0-based pages; this document is unchanged."""
+        return pages_ops.extract_pages(self._edit_source(), pages)
+
+    def split(
+        self, *, chunk_size: int | None = None, ranges: Sequence[Sequence[int]] | None = None
+    ) -> list[bytes]:
+        """Split into several PDFs by ``chunk_size`` or explicit 0-based page ``ranges``."""
+        return pages_ops.split_pdf(self._edit_source(), chunk_size=chunk_size, ranges=ranges)
+
+    def rotate_pages(self, angle: int, pages: Iterable[int] | None = None) -> None:
+        """Rotate pages (all by default) clockwise by a multiple of 90 degrees."""
+        self._apply(pages_ops.rotate_pages(self._edit_source(), angle, pages))
+
+    def reorder_pages(self, order: Sequence[int]) -> None:
+        """Reorder pages; ``order`` is a permutation of the 0-based page indexes."""
+        self._apply(pages_ops.reorder_pages(self._edit_source(), order))
+
+    def delete_pages(self, pages: Iterable[int]) -> None:
+        """Delete the given 0-based pages."""
+        self._apply(pages_ops.delete_pages(self._edit_source(), pages))
+
+    def insert_blank_page(self, index: int, *, size: tuple[float, float] | None = None) -> None:
+        """Insert a blank page before ``index`` (``page_count`` appends)."""
+        self._apply(pages_ops.insert_blank_page(self._edit_source(), index, size=size))
+
     # -- Document protocol -------------------------------------------------
 
     def _build_metadata(self) -> Metadata:
@@ -242,13 +301,13 @@ class PdfDocument:
 
 
 class PdfHandler(FormatHandler):
-    """Handler for ``.pdf`` documents (read and render; editing arrives in T040+)."""
+    """Handler for ``.pdf`` documents (read, render and page editing)."""
 
     format_id: ClassVar[str] = "pdf"
     extensions: ClassVar[tuple[str, ...]] = ("pdf",)
     mime_types: ClassVar[tuple[str, ...]] = (_PDF_MIME,)
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT, Capability.RENDER}
+        {Capability.READ, Capability.EXTRACT_TEXT, Capability.RENDER, Capability.EDIT}
     )
 
     @classmethod

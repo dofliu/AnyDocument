@@ -171,6 +171,142 @@ def thumbnail(
     typer.echo(str(target))
 
 
+pdf_app = typer.Typer(help="PDF page operations.", no_args_is_help=True)
+app.add_typer(pdf_app, name="pdf")
+
+
+def _read_pdf(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        raise _fail(f"file not found: {path}", 2) from None
+
+
+def _pdf_page_count(data: bytes) -> int:
+    import io
+
+    from pypdf import PdfReader
+
+    try:
+        return len(PdfReader(io.BytesIO(data)).pages)
+    except Exception as exc:
+        raise _fail(f"Invalid PDF: {exc}") from None
+
+
+def _pdf_edit(source: Path, output: Path, op: Any, spec: str) -> None:
+    """Run ``op(data, page_indexes)`` on ``source`` and write the result to ``output``."""
+    from anydoc.formats.pdf.pages import parse_page_spec
+
+    data = _read_pdf(source)
+    try:
+        indexes = parse_page_spec(spec, _pdf_page_count(data))
+        output.write_bytes(op(data, indexes))
+    except (AnyDocError, ValueError, IndexError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+PagesArg = Annotated[str, typer.Argument(help='1-based pages, e.g. "1,3-5,8-".')]
+OutOpt = Annotated[Path, typer.Option("--output", "-o", help="Output PDF path.")]
+
+
+@pdf_app.command("merge")
+def pdf_merge(
+    sources: Annotated[list[Path], typer.Argument(help="PDFs to merge, in order.")],
+    output: OutOpt,
+) -> None:
+    """Merge several PDFs into one."""
+    from anydoc.formats.pdf.pages import merge_pdfs
+
+    try:
+        output.write_bytes(merge_pdfs([_read_pdf(p) for p in sources]))
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+@pdf_app.command("split")
+def pdf_split(
+    source: FileArg,
+    out_dir: Annotated[Path, typer.Option("--out-dir", "-d", help="Output directory.")],
+    every: Annotated[int, typer.Option("--every", "-n", help="Pages per output file.")] = 1,
+) -> None:
+    """Split a PDF into files of N pages each (<stem>-001.pdf, ...)."""
+    from anydoc.formats.pdf.pages import split_file
+
+    _read_pdf(source)
+    try:
+        paths = split_file(source, out_dir, chunk_size=every)
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+    for p in paths:
+        typer.echo(str(p))
+
+
+@pdf_app.command("extract")
+def pdf_extract(source: FileArg, pages: PagesArg, output: OutOpt) -> None:
+    """Extract pages into a new PDF (order and duplicates preserved)."""
+    from anydoc.formats.pdf.pages import extract_pages
+
+    _pdf_edit(source, output, lambda d, ix: extract_pages(d, ix), pages)
+
+
+@pdf_app.command("delete")
+def pdf_delete(source: FileArg, pages: PagesArg, output: OutOpt) -> None:
+    """Delete pages."""
+    from anydoc.formats.pdf.pages import delete_pages
+
+    _pdf_edit(source, output, lambda d, ix: delete_pages(d, ix), pages)
+
+
+@pdf_app.command("rotate")
+def pdf_rotate(
+    source: FileArg,
+    output: OutOpt,
+    angle: Annotated[
+        int, typer.Option("--angle", "-a", help="Clockwise degrees (multiple of 90).")
+    ] = 90,
+    pages: Annotated[str, typer.Option("--pages", "-p", help="Pages to rotate.")] = "all",
+) -> None:
+    """Rotate pages clockwise."""
+    from anydoc.formats.pdf.pages import rotate_pages
+
+    _pdf_edit(source, output, lambda d, ix: rotate_pages(d, angle, ix), pages)
+
+
+@pdf_app.command("reorder")
+def pdf_reorder(
+    source: FileArg,
+    order: Annotated[str, typer.Argument(help='New order of every page, e.g. "3,1,2".')],
+    output: OutOpt,
+) -> None:
+    """Reorder pages; the order must list every page exactly once."""
+    from anydoc.formats.pdf.pages import reorder_pages
+
+    _pdf_edit(source, output, lambda d, ix: reorder_pages(d, ix), order)
+
+
+@pdf_app.command("insert-blank")
+def pdf_insert_blank(
+    source: FileArg,
+    output: OutOpt,
+    before: Annotated[
+        int, typer.Option("--before", "-b", help="1-based page to insert before (0 = append).")
+    ] = 0,
+) -> None:
+    """Insert a blank page (sized like its neighbour)."""
+    from anydoc.formats.pdf.pages import insert_blank_page
+
+    data = _read_pdf(source)
+    try:
+        n = _pdf_page_count(data)
+        index = n if before == 0 else before - 1
+        output.write_bytes(insert_blank_page(data, index))
+    except (AnyDocError, ValueError, IndexError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
