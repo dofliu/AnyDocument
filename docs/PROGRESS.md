@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-11-01 | T035 XLSX/CSV/JSON 互轉 | ✅ 完成 | 664 passed, 1 skipped | [報告](test-reports/2026-11-01_T035.md) | anydoc.converters.tabular（xlsx_to_csv 指定工作表、xlsx_to_csv_files 多工作表→多 CSV/TSV、csv_to_xlsx 型別保留（int/float/bool/date/datetime）、xlsx↔json、csv↔json、csv↔tsv/重新編碼；表頭自動偵測、重複/空白表頭補名、工作表名稱清理與去重；轉換圖邊 xlsx/csv/tsv/json 互轉無外部相依，`anydoc convert` 可用）；無新增相依；限制：轉換圖單邊僅輸出指定/第一張工作表（多張用 xlsx_to_csv_files）、公式輸出快取值 |
 | 2026-11-01 | T034 DOCX ↔ Markdown / HTML | ✅ 完成 | 620 passed, 1 skipped | [報告](test-reports/2026-11-01_T034.md) | anydoc.converters.docx_text（docx→markdown/html、markdown/html→docx；標題、有序/無序/巢狀清單、表格、粗斜體/刪除線/行內程式碼、超連結、圖片（md 輸出至 `<name>_files/`、html 用 data URI）、引用、程式碼區塊、分隔線；Markdown 跳脫字元；md→docx 經 markdown-it-py；本地圖片限來源資料夾內）；新增相依 markdown-it-py (MIT)；已知限制：DOCX 有序清單不重新起算編號 |
 | 2026-10-31 | T033 PDF ↔ 影像 | ✅ 完成 | 603 passed, 1 skipped | [報告](test-reports/2026-10-31_T033.md) | anydoc.converters.pdf_image（pdf_to_images：每頁輸出 png/jpg/gif/bmp/webp/tiff、可指定 dpi/頁；images_to_pdf：多張影像合一、透明底轉白、多影格 TIFF/GIF 每影格一頁；轉換圖邊 pdf→影像輸出第一頁、影像→pdf 單張；無外部工具相依）；Pillow/pypdfium2 既有相依 |
 | 2026-10-31 | T032 Office/ODF → PDF | ✅ 完成 | 590 passed, 1 skipped | [報告](test-reports/2026-10-31_T032.md) | anydoc.converters.office_pdf（docx/doc/odt/rtf/xlsx/xls/ods/pptx/ppt/odp → pdf，LibreOffice headless、requires=libreoffice、cost 2；來源暫存為正確副檔名以選對輸入過濾器）；anydoc.converters.load_builtin_converters 於 `anydoc.convert()` 首次使用時註冊至全域 graph；缺 LibreOffice 時回報 ConversionPathError 並提示工具 |

@@ -93,7 +93,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 資料驗證 | P2 | ⬜ | T065 |
 | 樞紐分析 | P2 | ⬜ | T066 |
 | 凍結窗格、欄寬列高、隱藏 | P2 | ⬜ | T062 |
-| 匯出 CSV / JSON / PDF | P0 | 🟨 | T035, T032（PDF 完成） |
+| 匯出 CSV / JSON / PDF | P0 | ✅ | T035, T032 |
 
 ### 5.4 PowerPoint / PPTX（對照 Microsoft PowerPoint）
 | 功能 | 優先級 | 狀態 | Roadmap |
@@ -113,7 +113,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 編碼/分隔符號自動偵測（含 Big5、UTF-8 BOM） | P0 | ✅ | T010 |
 | 讀寫、型別推斷 | P0 | ✅ | T010 |
 | 篩選 / 排序 / 去重 / 合併 (join) / 統計 | P1 | ⬜ | T080 |
-| 轉 XLSX / JSON / Parquet | P1 | ⬜ | T035 |
+| 轉 XLSX / JSON / Parquet | P1 | 🟨 | T035（XLSX/JSON 完成；Parquet 未做） |
 
 ### 5.6 CAD — DXF / DWG（對照 AutoCAD）
 | 功能 | 優先級 | 狀態 | Roadmap |
@@ -142,7 +142,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 |------|------|------|------|
 | 格式自動辨識 | P0 | ✅ | T003 |
 | 統一文字擷取 | P0 | ✅ | T030 |
-| 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成）、T032（Office/ODF→PDF）、T033（PDF↔影像）、T034（DOCX↔Markdown/HTML）；T035 待做 |
+| 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成）、T032（Office/ODF→PDF）、T033（PDF↔影像）、T034（DOCX↔Markdown/HTML）、T035（XLSX/CSV/TSV/JSON） |
 | 縮圖 | P1 | ⬜ | T036 |
 | 全文搜尋 | P2 | ⬜ | T090 |
 | 文件比較 (diff) | P2 | ⬜ | T091 |
