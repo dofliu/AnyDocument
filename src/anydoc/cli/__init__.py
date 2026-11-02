@@ -474,6 +474,63 @@ def pdf_permissions(
         raise _fail(str(exc)) from None
 
 
+@pdf_app.command("fields")
+def pdf_fields(
+    source: FileArg,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """List form fields of a PDF as JSON."""
+    from anydoc.formats.pdf.forms import list_form_fields
+
+    try:
+        _dump([f.to_dict() for f in list_form_fields(_read_pdf(source), password)])
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+
+
+@pdf_app.command("fill")
+def pdf_fill(
+    source: FileArg,
+    output: OutOpt,
+    set_: Annotated[
+        list[str] | None,
+        typer.Option("--set", help="NAME=VALUE (repeatable); true/false for checkboxes."),
+    ] = None,
+    values: Annotated[
+        Path | None, typer.Option("--values", help="JSON file mapping field names to values.")
+    ] = None,
+    flatten: Annotated[bool, typer.Option(help="Flatten the form after filling.")] = False,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """Fill form fields from --set options and/or a JSON file."""
+    import json
+
+    from anydoc.formats.pdf.forms import fill_form
+
+    data = _read_pdf(source)
+    vals: dict[str, Any] = {}
+    try:
+        if values is not None:
+            vals.update(json.loads(values.read_text(encoding="utf-8")))
+        for item in set_ or []:
+            name, sep, val = item.partition("=")
+            if not sep:
+                raise ValueError(f"Expected NAME=VALUE, got {item!r}")
+            vals[name] = {"true": True, "false": False}.get(val.lower(), val)
+        output.write_bytes(fill_form(data, vals, flatten=flatten, password=password))
+    except (AnyDocError, ValueError, KeyError, OSError) as exc:
+        raise _fail(str(exc).strip("'\"")) from None
+    typer.echo(str(output))
+
+
+@pdf_app.command("flatten")
+def pdf_flatten(source: FileArg, output: OutOpt) -> None:
+    """Flatten form fields into static page content."""
+    from anydoc.formats.pdf.forms import flatten_form
+
+    _pdf_secure(source, output, flatten_form)
+
+
 def main() -> None:
     """Console-script entry point."""
     app()

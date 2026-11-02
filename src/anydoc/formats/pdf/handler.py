@@ -16,6 +16,7 @@ from pypdf import PdfReader
 from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.pdf import forms as forms_ops
 from anydoc.formats.pdf import pages as pages_ops
 from anydoc.formats.pdf import security as security_ops
 from anydoc.formats.pdf import stamp as stamp_ops
@@ -285,6 +286,21 @@ class PdfDocument:
         """Strip encryption in place (the document must already be unlocked)."""
         self._require_unlocked()
         self._apply(security_ops.decrypt_pdf(self._data, self._password))
+
+    # -- forms (T043) ------------------------------------------------------
+
+    def form_fields(self) -> list[forms_ops.FormField]:
+        """List AcroForm fields (empty when the document has no form)."""
+        self._require_unlocked()
+        return forms_ops.list_form_fields(self._data, self._password)
+
+    def fill_form(self, values: dict[str, Any], *, flatten: bool = False) -> None:
+        """Fill form fields in place; see :func:`anydoc.formats.pdf.forms.fill_form`."""
+        self._apply(forms_ops.fill_form(self._edit_source(), values, flatten=flatten))
+
+    def flatten_form(self) -> None:
+        """Burn the form field values into the pages and remove the form."""
+        self._apply(forms_ops.flatten_form(self._edit_source()))
 
     # -- Document protocol -------------------------------------------------
 
