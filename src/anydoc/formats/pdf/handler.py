@@ -17,6 +17,7 @@ from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.pdf import pages as pages_ops
+from anydoc.formats.pdf import stamp as stamp_ops
 
 _PDF_MIME = "application/pdf"
 
@@ -243,6 +244,24 @@ class PdfDocument:
     def insert_blank_page(self, index: int, *, size: tuple[float, float] | None = None) -> None:
         """Insert a blank page before ``index`` (``page_count`` appends)."""
         self._apply(pages_ops.insert_blank_page(self._edit_source(), index, size=size))
+
+    # -- stamping (T041) ---------------------------------------------------
+
+    def add_text_watermark(self, text: str, **options: Any) -> None:
+        """Stamp a text watermark; see :func:`anydoc.formats.pdf.stamp.add_text_watermark`."""
+        self._apply(stamp_ops.add_text_watermark(self._edit_source(), text, **options))
+
+    def add_image_watermark(self, image: bytes | Path, **options: Any) -> None:
+        """Stamp an image watermark; see :func:`anydoc.formats.pdf.stamp.add_image_watermark`."""
+        self._apply(stamp_ops.add_image_watermark(self._edit_source(), image, **options))
+
+    def add_header_footer(self, **options: Any) -> None:
+        """Add header/footer text; see :func:`anydoc.formats.pdf.stamp.add_header_footer`."""
+        self._apply(stamp_ops.add_header_footer(self._edit_source(), **options))
+
+    def add_page_numbers(self, **options: Any) -> None:
+        """Add page numbers; see :func:`anydoc.formats.pdf.stamp.add_page_numbers`."""
+        self._apply(stamp_ops.add_page_numbers(self._edit_source(), **options))
 
     # -- Document protocol -------------------------------------------------
 

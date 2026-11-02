@@ -307,6 +307,98 @@ def pdf_insert_blank(
     typer.echo(str(output))
 
 
+PagesOpt = Annotated[str, typer.Option("--pages", "-p", help='1-based pages, e.g. "1,3-5".')]
+ColorOpt = Annotated[str, typer.Option("--color", help="Text color as #RRGGBB.")]
+
+
+def _pdf_stamp(source: Path, output: Path, op: Any, pages: str, **options: Any) -> None:
+    """Run a stamp function ``op(data, pages=..., **options)`` and write ``output``."""
+    from anydoc.formats.pdf.pages import parse_page_spec
+
+    data = _read_pdf(source)
+    try:
+        indexes = parse_page_spec(pages, _pdf_page_count(data))
+        output.write_bytes(op(data, pages=indexes, **options))
+    except (AnyDocError, ValueError, IndexError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+@pdf_app.command("watermark")
+def pdf_watermark(
+    source: FileArg,
+    output: OutOpt,
+    text: Annotated[str | None, typer.Option("--text", "-t", help="Watermark text.")] = None,
+    image: Annotated[Path | None, typer.Option("--image", "-i", help="Watermark image.")] = None,
+    pages: PagesOpt = "all",
+    opacity: Annotated[float, typer.Option(help="0 (invisible) to 1 (opaque).")] = 0.3,
+    angle: Annotated[float, typer.Option(help="Counter-clockwise degrees.")] = 45,
+    size: Annotated[float, typer.Option(help="Font size (text watermarks).")] = 48,
+    scale: Annotated[float, typer.Option(help="Image width / page width.")] = 0.5,
+    color: ColorOpt = "#808080",
+    tile: Annotated[bool, typer.Option(help="Repeat text over the page.")] = False,
+    under: Annotated[bool, typer.Option(help="Place beneath page content.")] = False,
+) -> None:
+    """Add a text or image watermark."""
+    from anydoc.formats.pdf.stamp import add_image_watermark, add_text_watermark
+
+    if (text is None) == (image is None):
+        raise _fail("give exactly one of --text or --image", 2)
+    if text is not None:
+        _pdf_stamp(
+            source, output, add_text_watermark, pages, text=text, font_size=size, color=color,
+            opacity=opacity, angle=angle, tile=tile, under=under,
+        )  # fmt: skip
+    else:
+        assert image is not None
+        _pdf_stamp(
+            source, output, add_image_watermark, pages, image=_read_pdf(image), scale=scale,
+            opacity=opacity, angle=0 if angle == 45 else angle, under=under,
+        )  # fmt: skip
+
+
+@pdf_app.command("header-footer")
+def pdf_header_footer(
+    source: FileArg,
+    output: OutOpt,
+    header: Annotated[str | None, typer.Option(help="Header text ({page}, {total}).")] = None,
+    footer: Annotated[str | None, typer.Option(help="Footer text ({page}, {total}).")] = None,
+    align: Annotated[str, typer.Option(help="left, center or right.")] = "center",
+    pages: PagesOpt = "all",
+    size: Annotated[float, typer.Option(help="Font size.")] = 10,
+    color: ColorOpt = "#000000",
+    start: Annotated[int, typer.Option(help="Number of the first page.")] = 1,
+) -> None:
+    """Add a header and/or footer."""
+    from anydoc.formats.pdf.stamp import add_header_footer
+
+    _pdf_stamp(
+        source, output, add_header_footer, pages, header=header, footer=footer, align=align,
+        font_size=size, color=color, start=start,
+    )  # fmt: skip
+
+
+@pdf_app.command("page-numbers")
+def pdf_page_numbers(
+    source: FileArg,
+    output: OutOpt,
+    fmt: Annotated[str, typer.Option("--format", "-f", help="Text with {page}/{total}.")] = (
+        "{page} / {total}"
+    ),
+    position: Annotated[str, typer.Option(help="e.g. bottom-center, top-right.")] = "bottom-center",
+    pages: PagesOpt = "all",
+    start: Annotated[int, typer.Option(help="Number of the first page.")] = 1,
+    size: Annotated[float, typer.Option(help="Font size.")] = 10,
+) -> None:
+    """Add page numbers."""
+    from anydoc.formats.pdf.stamp import add_page_numbers
+
+    _pdf_stamp(
+        source, output, add_page_numbers, pages, fmt=fmt, position=position, start=start,
+        font_size=size,
+    )  # fmt: skip
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
