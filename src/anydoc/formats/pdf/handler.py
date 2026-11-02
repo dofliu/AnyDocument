@@ -16,6 +16,7 @@ from pypdf import PdfReader
 from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.pdf import annotations as annot_ops
 from anydoc.formats.pdf import forms as forms_ops
 from anydoc.formats.pdf import pages as pages_ops
 from anydoc.formats.pdf import security as security_ops
@@ -301,6 +302,33 @@ class PdfDocument:
     def flatten_form(self) -> None:
         """Burn the form field values into the pages and remove the form."""
         self._apply(forms_ops.flatten_form(self._edit_source()))
+
+    # -- annotations (T044) ------------------------------------------------
+
+    def annotations(self) -> list[annot_ops.Annotation]:
+        """List annotations (links, popups and form widgets excluded)."""
+        self._require_unlocked()
+        return annot_ops.list_annotations(self._data, self._password)
+
+    def add_highlight(self, page: int, rects: Any, **kwargs: Any) -> None:
+        """Highlight rectangles; see :func:`anydoc.formats.pdf.annotations.add_highlight`."""
+        self._apply(annot_ops.add_highlight(self._edit_source(), page, rects, **kwargs))
+
+    def add_text_annotation(self, page: int, text: str, **kwargs: Any) -> None:
+        """Add a note or free-text box; see :func:`...annotations.add_text_annotation`."""
+        self._apply(annot_ops.add_text_annotation(self._edit_source(), page, text, **kwargs))
+
+    def add_rectangle(self, page: int, rect: Any, **kwargs: Any) -> None:
+        """Add a rectangle annotation; see :func:`...annotations.add_rectangle`."""
+        self._apply(annot_ops.add_rectangle(self._edit_source(), page, rect, **kwargs))
+
+    def add_stamp(self, page: int, label: str, rect: Any, **kwargs: Any) -> None:
+        """Add a stamp annotation; see :func:`...annotations.add_stamp`."""
+        self._apply(annot_ops.add_stamp(self._edit_source(), page, label, rect, **kwargs))
+
+    def remove_annotations(self, **kwargs: Any) -> None:
+        """Remove annotations; see :func:`...annotations.remove_annotations`."""
+        self._apply(annot_ops.remove_annotations(self._edit_source(), **kwargs))
 
     # -- Document protocol -------------------------------------------------
 

@@ -531,6 +531,71 @@ def pdf_flatten(source: FileArg, output: OutOpt) -> None:
     _pdf_secure(source, output, flatten_form)
 
 
+def _parse_rect(text: str) -> tuple[float, float, float, float]:
+    parts = [float(v) for v in text.split(",")]
+    if len(parts) != 4:
+        raise ValueError(f"Rectangle must be x0,y0,x1,y1; got {text!r}")
+    return (parts[0], parts[1], parts[2], parts[3])
+
+
+@pdf_app.command("annots")
+def pdf_annots(
+    source: FileArg,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """List annotations of a PDF as JSON."""
+    from anydoc.formats.pdf.annotations import list_annotations
+
+    try:
+        _dump([a.to_dict() for a in list_annotations(_read_pdf(source), password)])
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+
+
+@pdf_app.command("annotate")
+def pdf_annotate(
+    source: FileArg,
+    output: OutOpt,
+    kind: Annotated[str, typer.Option("--kind", help="highlight | note | box | rect | stamp")],
+    page: Annotated[int, typer.Option(help="1-based page number.")] = 1,
+    rect: Annotated[str, typer.Option(help="x0,y0,x1,y1 in PDF points.")] = "72,700,300,720",
+    text: Annotated[str, typer.Option(help="Text / stamp label.")] = "",
+    color: Annotated[str | None, typer.Option(help="Hex colour, e.g. FFFF00.")] = None,
+) -> None:
+    """Add a highlight, note, text box, rectangle or stamp annotation."""
+    from anydoc.formats.pdf import annotations as ann
+
+    data = _read_pdf(source)
+    try:
+        r = _parse_rect(rect)
+        extra: dict[str, Any] = {} if color is None else {"color": color}
+        p = page - 1
+        if kind == "highlight":
+            out = ann.add_highlight(data, p, r, contents=text, **extra)
+        elif kind == "note":
+            out = ann.add_text_annotation(data, p, text, point=(r[0], r[1]))
+        elif kind == "box":
+            out = ann.add_text_annotation(data, p, text, rect=r, **extra)
+        elif kind == "rect":
+            out = ann.add_rectangle(data, p, r, contents=text, **extra)
+        elif kind == "stamp":
+            out = ann.add_stamp(data, p, text or "DRAFT", r, **extra)
+        else:
+            raise ValueError(f"Unknown annotation kind: {kind}")
+        output.write_bytes(out)
+    except (AnyDocError, ValueError, IndexError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+@pdf_app.command("remove-annots")
+def pdf_remove_annots(source: FileArg, output: OutOpt) -> None:
+    """Remove all annotations (links and form fields are kept)."""
+    from anydoc.formats.pdf.annotations import remove_annotations
+
+    _pdf_secure(source, output, remove_annotations)
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
