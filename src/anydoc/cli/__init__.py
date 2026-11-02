@@ -399,6 +399,81 @@ def pdf_page_numbers(
     )  # fmt: skip
 
 
+def _pdf_secure(source: Path, output: Path, op: Any) -> None:
+    data = _read_pdf(source)
+    try:
+        output.write_bytes(op(data))
+    except (AnyDocError, ValueError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+@pdf_app.command("encrypt")
+def pdf_encrypt(
+    source: FileArg,
+    output: OutOpt,
+    user_password: Annotated[str, typer.Option("--user-password", help="Password to open.")] = "",
+    owner_password: Annotated[
+        str | None, typer.Option("--owner-password", help="Password with full rights.")
+    ] = None,
+    allow: Annotated[
+        str | None,
+        typer.Option(help="Comma list of allowed operations (print,modify,copy,annotate,...)."),
+    ] = None,
+    algorithm: Annotated[
+        str, typer.Option(help="AES-256, AES-128, RC4-128 or RC4-40.")
+    ] = "AES-256",
+    password: Annotated[str, typer.Option(help="Password of an already encrypted input.")] = "",
+) -> None:
+    """Encrypt a PDF with passwords and optional permission restrictions."""
+    from anydoc.formats.pdf.security import Permissions, encrypt_pdf
+
+    def run(data: bytes) -> bytes:
+        perms = (
+            Permissions.only(*[a.strip() for a in allow.split(",") if a.strip()])
+            if (allow is not None)
+            else None
+        )
+        return encrypt_pdf(
+            data, user_password, owner_password=owner_password, permissions=perms,
+            algorithm=algorithm, source_password=password,
+        )  # fmt: skip
+
+    _pdf_secure(source, output, run)
+
+
+@pdf_app.command("decrypt")
+def pdf_decrypt(
+    source: FileArg,
+    output: OutOpt,
+    password: Annotated[str, typer.Option(help="User or owner password.")] = "",
+) -> None:
+    """Remove the encryption from a PDF."""
+    from anydoc.formats.pdf.security import decrypt_pdf
+
+    _pdf_secure(source, output, lambda d: decrypt_pdf(d, password))
+
+
+@pdf_app.command("permissions")
+def pdf_permissions(
+    source: FileArg,
+    password: Annotated[str, typer.Option(help="User or owner password.")] = "",
+) -> None:
+    """Show encryption status and permissions as JSON."""
+    from anydoc.formats.pdf.security import get_permissions, is_encrypted
+
+    data = _read_pdf(source)
+    try:
+        _dump(
+            {
+                "encrypted": is_encrypted(data),
+                "permissions": get_permissions(data, password).to_dict(),
+            }
+        )
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+
+
 def main() -> None:
     """Console-script entry point."""
     app()

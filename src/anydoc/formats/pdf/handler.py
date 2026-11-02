@@ -17,6 +17,7 @@ from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.pdf import pages as pages_ops
+from anydoc.formats.pdf import security as security_ops
 from anydoc.formats.pdf import stamp as stamp_ops
 
 _PDF_MIME = "application/pdf"
@@ -197,6 +198,7 @@ class PdfDocument:
             self._plumber = None
         self._data = data
         self._reader = PdfReader(io.BytesIO(data))
+        self.is_encrypted = self._reader.is_encrypted
         if self._reader.is_encrypted:
             self._reader.decrypt(self._password)
         self.metadata = self._build_metadata()
@@ -262,6 +264,27 @@ class PdfDocument:
     def add_page_numbers(self, **options: Any) -> None:
         """Add page numbers; see :func:`anydoc.formats.pdf.stamp.add_page_numbers`."""
         self._apply(stamp_ops.add_page_numbers(self._edit_source(), **options))
+
+    # -- security (T042) ---------------------------------------------------
+
+    def permissions(self) -> security_ops.Permissions:
+        """Return the permissions of this document (everything allowed if unencrypted)."""
+        self._require_unlocked()
+        return security_ops.get_permissions(self._data, self._password)
+
+    def encrypt(self, user_password: str = "", **options: Any) -> bytes:
+        """Return an encrypted copy (bytes); see :func:`anydoc.formats.pdf.security.encrypt_pdf`.
+
+        This document is left unchanged.
+        """
+        self._require_unlocked()
+        options.setdefault("source_password", self._password)
+        return security_ops.encrypt_pdf(self._data, user_password, **options)
+
+    def decrypt(self) -> None:
+        """Strip encryption in place (the document must already be unlocked)."""
+        self._require_unlocked()
+        self._apply(security_ops.decrypt_pdf(self._data, self._password))
 
     # -- Document protocol -------------------------------------------------
 
