@@ -698,6 +698,33 @@ def pdf_tables(
         raise _fail(str(exc)) from None
 
 
+@pdf_app.command("ocr")
+def pdf_ocr(
+    source: FileArg,
+    output: OutOpt,
+    pages: Annotated[str, typer.Option(help='1-based page spec, e.g. "1,3-5" or "all".')] = "all",
+    lang: Annotated[
+        str, typer.Option(help="Tesseract languages, e.g. chi_tra+eng.")
+    ] = "chi_tra+eng",
+    dpi: Annotated[float, typer.Option(help="Render resolution for recognition.")] = 300.0,
+    force: Annotated[bool, typer.Option(help="Also OCR pages that already have text.")] = False,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """Make a scanned PDF searchable with Tesseract OCR."""
+    from anydoc.formats.pdf.ocr import ocr_pdf
+    from anydoc.formats.pdf.pages import parse_page_spec
+
+    data = _read_pdf(source)
+    try:
+        idx = parse_page_spec(pages, _pdf_page_count(data))
+        output.write_bytes(
+            ocr_pdf(data, idx, lang=lang, dpi=dpi, skip_text=not force, password=password)
+        )
+    except (AnyDocError, ValueError, IndexError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
 def main() -> None:
     """Console-script entry point."""
     app()

@@ -19,6 +19,7 @@ from anydoc.core.registry import FormatHandler
 from anydoc.formats.pdf import annotations as annot_ops
 from anydoc.formats.pdf import bookmarks as bookmark_ops
 from anydoc.formats.pdf import forms as forms_ops
+from anydoc.formats.pdf import ocr as ocr_ops
 from anydoc.formats.pdf import pages as pages_ops
 from anydoc.formats.pdf import security as security_ops
 from anydoc.formats.pdf import stamp as stamp_ops
@@ -359,6 +360,15 @@ class PdfDocument:
         return table_ops.extract_tables(
             self._data, pages, strategy=strategy, password=self._password
         )
+
+    # -- OCR (T047) --------------------------------------------------------
+
+    def ocr(
+        self, pages: Any = None, *, lang: str = ocr_ops.DEFAULT_LANG, dpi: float = 300.0
+    ) -> None:
+        """OCR scanned pages in place; see :func:`anydoc.formats.pdf.ocr.ocr_pdf`."""
+        self._require_unlocked()
+        self._apply(ocr_ops.ocr_pdf(self._data, pages, lang=lang, dpi=dpi, password=self._password))
 
     # -- Document protocol -------------------------------------------------
 
