@@ -17,6 +17,7 @@ from anydoc.core.errors import CorruptFileError, OperationNotSupportedError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.pdf import annotations as annot_ops
+from anydoc.formats.pdf import bookmarks as bookmark_ops
 from anydoc.formats.pdf import forms as forms_ops
 from anydoc.formats.pdf import pages as pages_ops
 from anydoc.formats.pdf import security as security_ops
@@ -329,6 +330,25 @@ class PdfDocument:
     def remove_annotations(self, **kwargs: Any) -> None:
         """Remove annotations; see :func:`...annotations.remove_annotations`."""
         self._apply(annot_ops.remove_annotations(self._edit_source(), **kwargs))
+
+    # -- bookmarks (T045) --------------------------------------------------
+
+    def bookmarks(self) -> list[bookmark_ops.Bookmark]:
+        """List the outline as a flat depth-first list with ``level`` hierarchy."""
+        self._require_unlocked()
+        return bookmark_ops.list_bookmarks(self._data, self._password)
+
+    def set_bookmarks(self, bookmarks: Any) -> None:
+        """Replace the outline; see :func:`anydoc.formats.pdf.bookmarks.set_bookmarks`."""
+        self._apply(bookmark_ops.set_bookmarks(self._edit_source(), bookmarks))
+
+    def add_bookmark(self, title: str, page: int, *, level: int = 0) -> None:
+        """Append a bookmark; see :func:`anydoc.formats.pdf.bookmarks.add_bookmark`."""
+        self._apply(bookmark_ops.add_bookmark(self._edit_source(), title, page, level=level))
+
+    def remove_bookmarks(self) -> None:
+        """Remove the whole outline."""
+        self._apply(bookmark_ops.remove_bookmarks(self._edit_source()))
 
     # -- Document protocol -------------------------------------------------
 

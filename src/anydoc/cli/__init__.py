@@ -596,6 +596,65 @@ def pdf_remove_annots(source: FileArg, output: OutOpt) -> None:
     _pdf_secure(source, output, remove_annotations)
 
 
+@pdf_app.command("bookmarks")
+def pdf_bookmarks(
+    source: FileArg,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """List bookmarks (outline) as JSON; pages are 1-based."""
+    from anydoc.formats.pdf.bookmarks import list_bookmarks
+
+    try:
+        _dump(
+            [
+                {**b.to_dict(), "page": None if b.page is None else b.page + 1}
+                for b in list_bookmarks(_read_pdf(source), password)
+            ]
+        )
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+
+
+@pdf_app.command("set-bookmarks")
+def pdf_set_bookmarks(
+    source: FileArg,
+    output: OutOpt,
+    spec: Annotated[
+        Path,
+        typer.Option(
+            "--spec",
+            help='JSON file: [{"title": "..", "page": 1, "level": 0}, ..] (1-based pages).',
+            exists=True,
+            dir_okay=False,
+        ),
+    ],
+) -> None:
+    """Replace the bookmarks with those described in a JSON file."""
+    import json
+
+    from anydoc.formats.pdf.bookmarks import set_bookmarks
+
+    data = _read_pdf(source)
+    try:
+        items = json.loads(spec.read_text(encoding="utf-8"))
+        marks = [
+            {"title": i["title"], "page": int(i["page"]) - 1, "level": int(i.get("level", 0))}
+            for i in items
+        ]
+        output.write_bytes(set_bookmarks(data, marks))
+    except (AnyDocError, ValueError, IndexError, KeyError, TypeError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+@pdf_app.command("remove-bookmarks")
+def pdf_remove_bookmarks(source: FileArg, output: OutOpt) -> None:
+    """Remove all bookmarks."""
+    from anydoc.formats.pdf.bookmarks import remove_bookmarks
+
+    _pdf_secure(source, output, remove_bookmarks)
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
