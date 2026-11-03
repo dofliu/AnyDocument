@@ -18,6 +18,7 @@ from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.pdf import annotations as annot_ops
 from anydoc.formats.pdf import bookmarks as bookmark_ops
+from anydoc.formats.pdf import compress as compress_ops
 from anydoc.formats.pdf import forms as forms_ops
 from anydoc.formats.pdf import ocr as ocr_ops
 from anydoc.formats.pdf import pages as pages_ops
@@ -369,6 +370,18 @@ class PdfDocument:
         """OCR scanned pages in place; see :func:`anydoc.formats.pdf.ocr.ocr_pdf`."""
         self._require_unlocked()
         self._apply(ocr_ops.ocr_pdf(self._data, pages, lang=lang, dpi=dpi, password=self._password))
+
+    # -- compression (T048) ------------------------------------------------
+
+    def compress(
+        self, *, image_quality: int = 70, max_image_side: int | None = 1600
+    ) -> compress_ops.CompressResult:
+        """Optimise in place; see :func:`anydoc.formats.pdf.compress.compress_pdf_with_stats`."""
+        result = compress_ops.compress_pdf_with_stats(
+            self._edit_source(), image_quality=image_quality, max_image_side=max_image_side
+        )
+        self._apply(result.data)
+        return result
 
     # -- Document protocol -------------------------------------------------
 

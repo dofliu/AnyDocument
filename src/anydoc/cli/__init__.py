@@ -725,6 +725,36 @@ def pdf_ocr(
     typer.echo(str(output))
 
 
+@pdf_app.command("compress")
+def pdf_compress(
+    source: FileArg,
+    output: OutOpt,
+    quality: Annotated[int, typer.Option(help="JPEG quality for images (1-100).")] = 70,
+    max_side: Annotated[
+        int, typer.Option(help="Downscale images whose longest side exceeds this (0 = never).")
+    ] = 1600,
+    no_images: Annotated[bool, typer.Option(help="Do not touch images.")] = False,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """Shrink a PDF (image resampling, duplicate-object removal, stream compression)."""
+    from anydoc.formats.pdf.compress import compress_pdf_with_stats
+
+    data = _read_pdf(source)
+    try:
+        result = compress_pdf_with_stats(
+            data,
+            image_quality=quality,
+            max_image_side=max_side or None,
+            recompress_images=not no_images,
+            password=password,
+        )
+        output.write_bytes(result.data)
+    except (AnyDocError, ValueError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+    _dump(result.to_dict())
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
