@@ -22,6 +22,7 @@ from anydoc.formats.pdf import forms as forms_ops
 from anydoc.formats.pdf import pages as pages_ops
 from anydoc.formats.pdf import security as security_ops
 from anydoc.formats.pdf import stamp as stamp_ops
+from anydoc.formats.pdf import tables as table_ops
 
 _PDF_MIME = "application/pdf"
 
@@ -349,6 +350,15 @@ class PdfDocument:
     def remove_bookmarks(self) -> None:
         """Remove the whole outline."""
         self._apply(bookmark_ops.remove_bookmarks(self._edit_source()))
+
+    # -- tables (T046) -----------------------------------------------------
+
+    def tables(self, pages: Any = None, *, strategy: str = "lines") -> list[table_ops.PdfTable]:
+        """Extract tables; see :func:`anydoc.formats.pdf.tables.extract_tables`."""
+        self._require_unlocked()
+        return table_ops.extract_tables(
+            self._data, pages, strategy=strategy, password=self._password
+        )
 
     # -- Document protocol -------------------------------------------------
 

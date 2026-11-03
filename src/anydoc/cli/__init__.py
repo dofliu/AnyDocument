@@ -655,6 +655,49 @@ def pdf_remove_bookmarks(source: FileArg, output: OutOpt) -> None:
     _pdf_secure(source, output, remove_bookmarks)
 
 
+@pdf_app.command("tables")
+def pdf_tables(
+    source: FileArg,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output", "-o", help="Write .xlsx (one sheet per table) or a folder of CSV files."
+        ),
+    ] = None,
+    pages: Annotated[str, typer.Option(help='1-based page spec, e.g. "1,3-5" or "all".')] = "all",
+    strategy: Annotated[
+        str, typer.Option(help="lines (ruled tables) or text (aligned).")
+    ] = "lines",
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """Extract tables as JSON, or export them to XLSX / CSV files with --output."""
+    from anydoc.converters.pdf_tables import pdf_tables_to_csv, pdf_tables_to_xlsx
+    from anydoc.formats.pdf.pages import parse_page_spec
+    from anydoc.formats.pdf.tables import extract_tables
+
+    data = _read_pdf(source)
+    try:
+        idx = parse_page_spec(pages, _pdf_page_count(data))
+        if output is None:
+            _dump(
+                [
+                    {**t.to_dict(), "page": t.page + 1}
+                    for t in extract_tables(data, idx, strategy=strategy, password=password)
+                ]
+            )
+            return
+        if output.suffix.lower() == ".xlsx":
+            pdf_tables_to_xlsx(source, output, pages=idx, strategy=strategy, password=password)
+            typer.echo(str(output))
+        else:
+            for p in pdf_tables_to_csv(
+                source, output, pages=idx, strategy=strategy, password=password
+            ):
+                typer.echo(str(p))
+    except (AnyDocError, ValueError, IndexError, OSError) as exc:
+        raise _fail(str(exc)) from None
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
