@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
@@ -20,6 +21,7 @@ from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.docx import edit as _edit
 from anydoc.formats.docx import replace as _replace
+from anydoc.formats.docx import tables as _tables
 
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _HEADING_RE = re.compile(r"^heading\s*(\d+)$", re.IGNORECASE)
@@ -223,6 +225,101 @@ class DocxDocument:
     def delete_paragraph(self, index: int) -> None:
         """Delete body paragraph ``index``."""
         _edit.delete_paragraph(_edit.paragraph_at(self._doc, index))
+
+    # -- tables and pictures ------------------------------------------------
+
+    def add_table(
+        self,
+        rows: Sequence[Sequence[Any]] | None = None,
+        *,
+        n_rows: int | None = None,
+        n_cols: int | None = None,
+        header: bool = False,
+        style: str | None = "Table Grid",
+        alignment: str | None = None,
+    ) -> int:
+        """Append a table from ``rows`` (or an empty grid); returns its table index."""
+        _tables.add_table(
+            self._doc,
+            rows,
+            n_rows=n_rows,
+            n_cols=n_cols,
+            header=header,
+            style=style,
+            alignment=alignment,
+        )
+        return len(self._doc.tables) - 1
+
+    def set_cell(self, table: int, row: int, col: int, text: str, **fmt: Any) -> None:
+        """Set the text of a table cell (0-based indexes); ``fmt`` formats the run."""
+        t = _tables.table_at(self._doc, table)
+        _tables.set_cell_text(_tables.cell_at(t, row, col), text, **fmt)
+
+    def merge_cells(self, table: int, top: int, left: int, bottom: int, right: int) -> None:
+        """Merge a rectangular cell range (inclusive) of a table."""
+        _tables.merge_cells(_tables.table_at(self._doc, table), top, left, bottom, right)
+
+    def set_table_borders(
+        self,
+        table: int,
+        *,
+        style: str = "single",
+        size: float = 0.5,
+        color: str = "000000",
+        edges: Sequence[str] | None = None,
+    ) -> None:
+        """Set borders of a table (``size`` in points)."""
+        _tables.set_borders(
+            _tables.table_at(self._doc, table), style=style, size=size, color=color, edges=edges
+        )
+
+    def shade_cell(self, table: int, row: int, col: int, color: str) -> None:
+        """Fill a table cell with a solid ``color``."""
+        t = _tables.table_at(self._doc, table)
+        _tables.shade_cell(_tables.cell_at(t, row, col), color)
+
+    def add_table_row(
+        self, table: int, values: Sequence[Any] | None = None, *, index: int | None = None
+    ) -> int:
+        """Insert a table row (appended by default); returns its index."""
+        return _tables.add_row(_tables.table_at(self._doc, table), values, index=index)
+
+    def delete_table_row(self, table: int, index: int) -> None:
+        """Delete a table row."""
+        _tables.delete_row(_tables.table_at(self._doc, table), index)
+
+    def add_table_column(
+        self, table: int, values: Sequence[Any] | None = None, *, width_mm: float | None = None
+    ) -> int:
+        """Append a table column; returns its index."""
+        return _tables.add_column(_tables.table_at(self._doc, table), values, width_mm=width_mm)
+
+    def delete_table_column(self, table: int, index: int) -> None:
+        """Delete a table column."""
+        _tables.delete_column(_tables.table_at(self._doc, table), index)
+
+    def set_column_width(self, table: int, index: int, width: float, unit: str = "mm") -> None:
+        """Set a table column width (``unit``: mm, pt or in)."""
+        _tables.set_column_width(_tables.table_at(self._doc, table), index, width, unit)
+
+    def set_row_height(self, table: int, index: int, height: float, unit: str = "mm") -> None:
+        """Set a table row's minimum height (``unit``: mm, pt or in)."""
+        _tables.set_row_height(_tables.table_at(self._doc, table), index, height, unit)
+
+    def add_image(
+        self,
+        source: Path | bytes,
+        *,
+        width: float | None = None,
+        height: float | None = None,
+        unit: str = "mm",
+        alignment: str | None = None,
+    ) -> tuple[int, int]:
+        """Append a picture; returns its size ``(width, height)`` in EMU."""
+        shape = _tables.add_image(
+            self._doc, source, width=width, height=height, unit=unit, alignment=alignment
+        )
+        return int(shape.width), int(shape.height)
 
     def replace_text(
         self,
