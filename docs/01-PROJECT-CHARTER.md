@@ -59,7 +59,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 表格擷取 | P1 | ✅ | T046 |
 | OCR（掃描檔轉可搜尋） | P2 | ✅ | T047 |
 | 壓縮 / 最佳化 | P2 | ✅ | T048 |
-| 遮蔽 (Redaction) | P2 | ⬜ | T049 |
+| 遮蔽 (Redaction) | P2 | ✅ | T049 |
 | 數位簽章驗證 | P3 | ⬜ | T094 |
 
 ### 5.2 Word / DOCX（對照 Microsoft Word）

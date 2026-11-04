@@ -22,6 +22,7 @@ from anydoc.formats.pdf import compress as compress_ops
 from anydoc.formats.pdf import forms as forms_ops
 from anydoc.formats.pdf import ocr as ocr_ops
 from anydoc.formats.pdf import pages as pages_ops
+from anydoc.formats.pdf import redact as redact_ops
 from anydoc.formats.pdf import security as security_ops
 from anydoc.formats.pdf import stamp as stamp_ops
 from anydoc.formats.pdf import tables as table_ops
@@ -380,6 +381,14 @@ class PdfDocument:
         result = compress_ops.compress_pdf_with_stats(
             self._edit_source(), image_quality=image_quality, max_image_side=max_image_side
         )
+        self._apply(result.data)
+        return result
+
+    # -- redaction (T049) --------------------------------------------------
+
+    def redact(self, **options: Any) -> redact_ops.RedactResult:
+        """Redact in place; see :func:`anydoc.formats.pdf.redact.redact_pdf`."""
+        result = redact_ops.redact_pdf(self._edit_source(), **options)
         self._apply(result.data)
         return result
 

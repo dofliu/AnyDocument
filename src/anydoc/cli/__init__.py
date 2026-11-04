@@ -755,6 +755,56 @@ def pdf_compress(
     _dump(result.to_dict())
 
 
+@pdf_app.command("redact")
+def pdf_redact(
+    source: FileArg,
+    output: OutOpt,
+    text: Annotated[
+        list[str] | None, typer.Option("--text", "-t", help="Text to remove (repeatable).")
+    ] = None,
+    region: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--region", "-r", help="PAGE:x0,top,x1,bottom in points from top-left (1-based page)."
+        ),
+    ] = None,
+    regex: Annotated[
+        bool, typer.Option(help="Treat --text values as regular expressions.")
+    ] = False,
+    case_sensitive: Annotated[bool, typer.Option(help="Case-sensitive text search.")] = False,
+    dpi: Annotated[float, typer.Option(help="Rasterisation resolution of redacted pages.")] = 200.0,
+    password: Annotated[str, typer.Option(help="PDF password.")] = "",
+) -> None:
+    """Permanently redact text or regions (redacted pages become image-only)."""
+    from anydoc.formats.pdf.redact import redact_pdf
+
+    data = _read_pdf(source)
+    try:
+        regions: list[tuple[int, tuple[float, ...]]] = []
+        for spec in region or []:
+            page_s, _, coords = spec.partition(":")
+            nums = tuple(float(v) for v in coords.split(","))
+            if len(nums) != 4:
+                raise ValueError(f"Invalid region {spec!r}; expected PAGE:x0,top,x1,bottom")
+            regions.append((int(page_s) - 1, nums))
+        if not text and not regions:
+            raise ValueError("Nothing to redact: give --text and/or --region")
+        result = redact_pdf(
+            data,
+            texts=text or [],
+            regions=regions,
+            regex=regex,
+            case_sensitive=case_sensitive,
+            dpi=dpi,
+            password=password,
+        )
+        output.write_bytes(result.data)
+    except (AnyDocError, ValueError, IndexError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+    _dump(result.to_dict())
+
+
 def main() -> None:
     """Console-script entry point."""
     app()
