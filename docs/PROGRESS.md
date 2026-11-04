@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-11-04 | T051 DOCX 尋找與取代 | ✅ 完成 | 860 passed, 2 skipped | [報告](test-reports/2026-11-04_T051.md) | anydoc.formats.docx.replace（replace_text/find_text：跨 run 比對、取代文字沿用比對起點 run 格式、純文字或正規表示式（含 \\1 群組參照）、忽略大小寫、整字、次數上限；涵蓋本文、巢狀表格、頁首頁尾（含首頁/偶數頁）；以 w:t 為單位處理，tab/換行保持原位）；DocxDocument.replace_text/find_text；無新增相依；限制：不跨段落比對 |
 | 2026-11-04 | T050 DOCX 建立與基本編輯 | ✅ 完成 | 844 passed, 2 skipped | [報告](test-reports/2026-11-04_T050.md) | anydoc.formats.docx.edit＋DocxDocument 編輯 API（add_paragraph 含粗斜體/底線/刪除線/字型（含東亞）/大小/顏色/對齊、add_heading 0-9、add_list 項目符號/編號/3 層、add_page_break、set/insert/delete_paragraph、set_properties、to_bytes）；DocxHandler.create()，能力新增 WRITE/EDIT；無新增相依；限制：有序清單不重新起算編號 |
 | 2026-11-04 | T049 PDF 遮蔽 (Redaction) | ✅ 完成 | 831 passed, 2 skipped | [報告](test-reports/2026-11-04_T049.md) | anydoc.formats.pdf.redact（redact_pdf：依文字（純文字/正規表示式、大小寫）與座標區域遮蔽，受影響頁面以 pypdfium2 點陣化並燒入黑框、重建為純影像頁，文字層/向量/註解一併移除，未遮蔽頁原樣保留；find_text 取得比對座標；verify_redaction 驗證不可擷取，文字遮蔽後自動驗證；RedactResult）；PdfDocument.redact；CLI `anydoc pdf redact -t/-r`；無新增相依；限制：遮蔽頁失去文字層（可再 OCR）、旋轉頁不支援文字搜尋（可用區域）、僅保留中繼資料 |
 | 2026-11-03 | T048 PDF 壓縮 / 最佳化 | ✅ 完成 | 819 passed, 2 skipped | [報告](test-reports/2026-11-03_T048.md) | anydoc.formats.pdf.compress（compress_pdf/compress_pdf_with_stats：RGB/灰階影像 JPEG 重新編碼與長邊縮圖（預設 q70、1600px；保留調色盤/透明影像）、compress_identical_objects 合併重複與孤兒物件、內容串流 deflate；無法縮小時回傳原檔；CompressResult 含前後大小與比例）；PdfDocument.compress；CLI `anydoc pdf compress`；無新增相依；限制：加密 PDF 須先 decrypt、不處理字型子集化 |

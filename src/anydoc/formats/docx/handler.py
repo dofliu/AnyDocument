@@ -19,6 +19,7 @@ from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.docx import edit as _edit
+from anydoc.formats.docx import replace as _replace
 
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _HEADING_RE = re.compile(r"^heading\s*(\d+)$", re.IGNORECASE)
@@ -222,6 +223,52 @@ class DocxDocument:
     def delete_paragraph(self, index: int) -> None:
         """Delete body paragraph ``index``."""
         _edit.delete_paragraph(_edit.paragraph_at(self._doc, index))
+
+    def replace_text(
+        self,
+        find: str,
+        replace: str,
+        *,
+        regex: bool = False,
+        ignore_case: bool = False,
+        whole_word: bool = False,
+        count: int = 0,
+        body: bool = True,
+        headers_footers: bool = True,
+    ) -> int:
+        """Replace text (across runs, keeping formatting); return the replacement count."""
+        return _replace.replace_text(
+            self._doc,
+            find,
+            replace,
+            regex=regex,
+            ignore_case=ignore_case,
+            whole_word=whole_word,
+            count=count,
+            body=body,
+            headers_footers=headers_footers,
+        )
+
+    def find_text(
+        self,
+        find: str,
+        *,
+        regex: bool = False,
+        ignore_case: bool = False,
+        whole_word: bool = False,
+        body: bool = True,
+        headers_footers: bool = True,
+    ) -> list[_replace.TextMatch]:
+        """Return all matches of ``find`` (body, headers and footers) without editing."""
+        return _replace.find_text(
+            self._doc,
+            find,
+            regex=regex,
+            ignore_case=ignore_case,
+            whole_word=whole_word,
+            body=body,
+            headers_footers=headers_footers,
+        )
 
     def set_properties(
         self,
