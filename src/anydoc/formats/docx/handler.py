@@ -1,4 +1,4 @@
-"""Read-oriented DOCX document and handler built on python-docx."""
+"""DOCX document and handler (read, create, basic edit) built on python-docx."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from docx.text.paragraph import Paragraph
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.docx import edit as _edit
 
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _HEADING_RE = re.compile(r"^heading\s*(\d+)$", re.IGNORECASE)
@@ -163,6 +164,91 @@ class DocxDocument:
                 notes.append(text)
         return notes
 
+    # -- editing -----------------------------------------------------------
+
+    def add_paragraph(
+        self,
+        text: str = "",
+        *,
+        style: str | None = None,
+        alignment: str | None = None,
+        bold: bool | None = None,
+        italic: bool | None = None,
+        underline: bool | None = None,
+        strike: bool | None = None,
+        font: str | None = None,
+        size: float | None = None,
+        color: str | None = None,
+    ) -> Paragraph:
+        """Append a paragraph; formatting options apply to its text run."""
+        return _edit.add_paragraph(
+            self._doc,
+            text,
+            style=style,
+            alignment=alignment,
+            bold=bold,
+            italic=italic,
+            underline=underline,
+            strike=strike,
+            font=font,
+            size=size,
+            color=color,
+        )
+
+    def add_heading(self, text: str, level: int = 1) -> Paragraph:
+        """Append a heading (level 0 = Title, 1-9 = Heading n)."""
+        return _edit.add_heading(self._doc, text, level)
+
+    def add_list(
+        self, items: list[str], *, ordered: bool = False, level: int = 0
+    ) -> list[Paragraph]:
+        """Append a bulleted (default) or numbered list at nesting ``level`` 0-2."""
+        return _edit.add_list(self._doc, items, ordered=ordered, level=level)
+
+    def add_page_break(self) -> None:
+        """Append a page break."""
+        _edit.add_page_break(self._doc)
+
+    def set_paragraph_text(self, index: int, text: str, **fmt: Any) -> None:
+        """Replace the text of body paragraph ``index``, keeping its style."""
+        _edit.set_paragraph_text(_edit.paragraph_at(self._doc, index), text, **fmt)
+
+    def insert_paragraph(
+        self, index: int, text: str = "", *, style: str | None = None
+    ) -> Paragraph:
+        """Insert a new paragraph after body paragraph ``index``."""
+        return _edit.insert_paragraph_after(_edit.paragraph_at(self._doc, index), text, style)
+
+    def delete_paragraph(self, index: int) -> None:
+        """Delete body paragraph ``index``."""
+        _edit.delete_paragraph(_edit.paragraph_at(self._doc, index))
+
+    def set_properties(
+        self,
+        *,
+        title: str | None = None,
+        author: str | None = None,
+        subject: str | None = None,
+        keywords: str | None = None,
+    ) -> None:
+        """Update core properties and refresh ``metadata``."""
+        cp = self._doc.core_properties
+        if title is not None:
+            cp.title = title
+        if author is not None:
+            cp.author = author
+        if subject is not None:
+            cp.subject = subject
+        if keywords is not None:
+            cp.keywords = keywords
+        self.metadata = self._build_metadata()
+
+    def to_bytes(self) -> bytes:
+        """Serialize the document to DOCX bytes."""
+        buf = io.BytesIO()
+        self._doc.save(buf)
+        return buf.getvalue()
+
     # -- Document protocol -------------------------------------------------
 
     def _build_metadata(self) -> Metadata:
@@ -228,7 +314,7 @@ class DocxHandler(FormatHandler):
     extensions: ClassVar[tuple[str, ...]] = ("docx",)
     mime_types: ClassVar[tuple[str, ...]] = (_DOCX_MIME,)
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT}
+        {Capability.READ, Capability.WRITE, Capability.EDIT, Capability.EXTRACT_TEXT}
     )
 
     @classmethod
@@ -237,6 +323,10 @@ class DocxHandler(FormatHandler):
         if path is not None and path.suffix.lower() == ".docx":
             return 0.9
         return 0.0
+
+    def create(self) -> DocxDocument:
+        """Create a new empty DOCX document (use ``save(path)`` to write it)."""
+        return DocxDocument(load_docx())
 
     def open(self, source: Path | bytes) -> DocxDocument:
         """Open a DOCX from a path or bytes; invalid packages raise ``CorruptFileError``."""
