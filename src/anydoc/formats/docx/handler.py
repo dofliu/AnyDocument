@@ -20,6 +20,7 @@ from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.docx import edit as _edit
+from anydoc.formats.docx import layout as _layout
 from anydoc.formats.docx import replace as _replace
 from anydoc.formats.docx import tables as _tables
 
@@ -146,6 +147,90 @@ class DocxDocument:
                 }
             )
         return out
+
+    def sections(self) -> list[_layout.SectionInfo]:
+        """Return the page layout of every section."""
+        return [_layout.section_info(self._doc, i) for i in range(len(self._doc.sections))]
+
+    def add_section(self, start_type: str = "new_page") -> int:
+        """Append a section (``new_page``, ``continuous``, ``even_page``, ``odd_page``…).
+
+        Returns the new section index.
+        """
+        _layout.add_section(self._doc, start_type)
+        return len(self._doc.sections) - 1
+
+    def set_page_size(
+        self,
+        paper: str | None = None,
+        *,
+        width: float | None = None,
+        height: float | None = None,
+        orientation: str | None = None,
+        section: int = -1,
+    ) -> None:
+        """Set paper size (``A4``, ``Letter``… or ``width``/``height`` mm) and orientation."""
+        _layout.set_page_size(
+            _layout.section_at(self._doc, section),
+            paper,
+            width=width,
+            height=height,
+            orientation=orientation,
+        )
+
+    def set_orientation(self, orientation: str, *, section: int = -1) -> None:
+        """Set a section to ``portrait`` or ``landscape`` (swaps page dimensions)."""
+        _layout.set_orientation(_layout.section_at(self._doc, section), orientation)
+
+    def set_margins(
+        self,
+        *,
+        top: float | None = None,
+        bottom: float | None = None,
+        left: float | None = None,
+        right: float | None = None,
+        header: float | None = None,
+        footer: float | None = None,
+        gutter: float | None = None,
+        section: int = -1,
+    ) -> None:
+        """Set margins in millimetres for a section."""
+        _layout.set_margins(
+            _layout.section_at(self._doc, section),
+            top=top,
+            bottom=bottom,
+            left=left,
+            right=right,
+            header=header,
+            footer=footer,
+            gutter=gutter,
+        )
+
+    def set_header(
+        self, text: str = "", *, section: int = 0, which: str = "primary", **opts: Any
+    ) -> None:
+        """Set header text (``{page}``/``{pages}`` become fields); see ``set_header_footer``."""
+        _layout.set_header_footer(
+            _layout.section_at(self._doc, section), "header", text, which=which, **opts
+        )
+
+    def set_footer(
+        self, text: str = "", *, section: int = 0, which: str = "primary", **opts: Any
+    ) -> None:
+        """Set footer text (``{page}``/``{pages}`` become fields); see ``set_header_footer``."""
+        _layout.set_header_footer(
+            _layout.section_at(self._doc, section), "footer", text, which=which, **opts
+        )
+
+    def add_page_number(self, *, section: int = 0, **opts: Any) -> None:
+        """Insert a PAGE field (default: centered in the footer)."""
+        _layout.add_page_number(_layout.section_at(self._doc, section), **opts)
+
+    def header_footer_fields(
+        self, kind: str = "footer", *, section: int = 0, which: str = "primary"
+    ) -> list[str]:
+        """List field instructions (``PAGE``, ``NUMPAGES``) in a header/footer."""
+        return _layout.header_footer_fields(_layout.section_at(self._doc, section), kind, which)
 
     def footnotes(self) -> list[str]:
         """Return footnote texts (separators excluded), in id order."""

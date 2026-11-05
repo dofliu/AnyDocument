@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-11-05 | T053 DOCX 頁首頁尾、分節、版面 | ✅ 完成 | 883 passed, 2 skipped | [報告](test-reports/2026-11-05_T053.md) | anydoc.formats.docx.layout（set_page_size 命名紙張 A3/A4/A5/B4/B5/Letter/Legal 與自訂尺寸、set_orientation 自動對調寬高、set_margins 含頁首頁尾距離與裝訂線、add_section 五種分節類型、set_header_footer 文字/對齊/格式，`{page}`/`{pages}` 轉為 PAGE/NUMPAGES 欄位、首頁不同與奇偶頁變體、header_footer_fields、section_info）；DocxDocument 對應方法（以節索引操作）；無新增相依；限制：長度回報四捨五入至 0.1 mm，頁碼欄位預留值為 1 |
 | 2026-11-04 | T052 DOCX 表格與圖片 | ✅ 完成 | 872 passed, 2 skipped | [報告](test-reports/2026-11-04_T052.md) | anydoc.formats.docx.tables（add_table 資料列/表頭/對齊/樣式、set_cell_text、merge_cells 水平垂直區塊、set_borders、shade_cell、add/delete 列欄、欄寬列高、add_image 尺寸保持比例/對齊）；DocxDocument 對應方法（以表格索引操作）；無新增相依；限制：欄寬列高有 twips 取整誤差 |
 | 2026-11-04 | T051 DOCX 尋找與取代 | ✅ 完成 | 860 passed, 2 skipped | [報告](test-reports/2026-11-04_T051.md) | anydoc.formats.docx.replace（replace_text/find_text：跨 run 比對、取代文字沿用比對起點 run 格式、純文字或正規表示式（含 \\1 群組參照）、忽略大小寫、整字、次數上限；涵蓋本文、巢狀表格、頁首頁尾（含首頁/偶數頁）；以 w:t 為單位處理，tab/換行保持原位）；DocxDocument.replace_text/find_text；無新增相依；限制：不跨段落比對 |
 | 2026-11-04 | T050 DOCX 建立與基本編輯 | ✅ 完成 | 844 passed, 2 skipped | [報告](test-reports/2026-11-04_T050.md) | anydoc.formats.docx.edit＋DocxDocument 編輯 API（add_paragraph 含粗斜體/底線/刪除線/字型（含東亞）/大小/顏色/對齊、add_heading 0-9、add_list 項目符號/編號/3 層、add_page_break、set/insert/delete_paragraph、set_properties、to_bytes）；DocxHandler.create()，能力新增 WRITE/EDIT；無新增相依；限制：有序清單不重新起算編號 |
