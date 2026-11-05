@@ -23,6 +23,7 @@ from anydoc.formats.docx import edit as _edit
 from anydoc.formats.docx import layout as _layout
 from anydoc.formats.docx import replace as _replace
 from anydoc.formats.docx import tables as _tables
+from anydoc.formats.docx import toc as _toc
 
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _HEADING_RE = re.compile(r"^heading\s*(\d+)$", re.IGNORECASE)
@@ -231,6 +232,32 @@ class DocxDocument:
     ) -> list[str]:
         """List field instructions (``PAGE``, ``NUMPAGES``) in a header/footer."""
         return _layout.header_footer_fields(_layout.section_at(self._doc, section), kind, which)
+
+    # -- table of contents -------------------------------------------------
+
+    def toc_entries(self, levels: str | tuple[int, int] = "1-3") -> list[_toc.TocEntry]:
+        """List the headings that a TOC with ``levels`` (e.g. ``"1-3"``) would contain."""
+        return _toc.toc_entries(self._doc, levels)
+
+    def add_toc(self, **opts: Any) -> list[_toc.TocEntry]:
+        """Insert a TOC field pre-filled from the headings; see ``toc.add_toc``."""
+        return _toc.add_toc(self._doc, **opts)
+
+    def add_static_toc(self, **opts: Any) -> list[_toc.TocEntry]:
+        """Insert a static (field-less) TOC built from the headings; see ``toc.add_static_toc``."""
+        return _toc.add_static_toc(self._doc, **opts)
+
+    def has_toc(self) -> bool:
+        """Return whether the document already contains a table of contents."""
+        return _toc.has_toc(self._doc)
+
+    def toc_info(self) -> dict[str, Any]:
+        """Describe the existing TOC (kind, field instruction, entry texts)."""
+        return _toc.toc_info(self._doc)
+
+    def remove_toc(self) -> int:
+        """Remove the table of contents; returns the number of paragraphs removed."""
+        return _toc.remove_toc(self._doc)
 
     def footnotes(self) -> list[str]:
         """Return footnote texts (separators excluded), in id order."""
