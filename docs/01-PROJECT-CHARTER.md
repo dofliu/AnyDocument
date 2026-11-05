@@ -75,7 +75,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 頁首/頁尾/頁碼、分節、版面設定 | P1 | ✅ | T053 |
 | 目錄產生 | P2 | ✅ | T054 |
 | 追蹤修訂與註解（讀取/接受/拒絕） | P2 | ✅ | T055 |
-| 合併列印 (Mail Merge) | P1 | ⬜ | T056 |
+| 合併列印 (Mail Merge) | P1 | ✅ | T056 |
 | 清單（項目符號/編號） | P1 | ✅ | T050 |
 | 匯出 PDF / HTML / Markdown | P0 | 🟨 | T032（PDF 完成）, T034（Markdown/HTML 完成）|
 

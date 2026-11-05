@@ -808,3 +808,43 @@ def pdf_redact(
 def main() -> None:
     """Console-script entry point."""
     app()
+
+
+@app.command("mailmerge")
+def mailmerge(
+    template: Annotated[Path, typer.Argument(help="DOCX template with {{field}} placeholders.")],
+    data: Annotated[Path, typer.Argument(help="Data source (.csv, .tsv, .xlsx or .json).")],
+    output: Annotated[
+        Path,
+        typer.Argument(help="Output: a directory (one DOCX per record), or .docx/.pdf (merged)."),
+    ],
+    name_field: Annotated[
+        str | None, typer.Option("--name-field", "-n", help="Field used in per-record file names.")
+    ] = None,
+    missing: Annotated[
+        str, typer.Option("--missing", help="Unknown placeholders: keep, blank or error.")
+    ] = "keep",
+) -> None:
+    """Mail merge a DOCX template with CSV/XLSX/JSON records."""
+    from anydoc.converters import mailmerge as mm
+
+    if missing not in {"keep", "blank", "error"}:
+        raise _fail(f"invalid --missing value: {missing}", 2)
+    policy: Any = missing
+    try:
+        suffix = output.suffix.lower()
+        if suffix == ".pdf":
+            mm.merge_to_pdf(template, data, output, missing=policy)
+            typer.echo(str(output))
+        elif suffix == ".docx":
+            mm.merge_to_single(template, data, output, missing=policy)
+            typer.echo(str(output))
+        else:
+            for path in mm.merge_to_files(
+                template, data, output, name_field=name_field, missing=policy
+            ):
+                typer.echo(str(path))
+    except FileNotFoundError as exc:
+        raise _fail(f"file not found: {exc.args[0]}", 2) from None
+    except (AnyDocError, ValueError) as exc:
+        raise _fail(str(exc)) from None

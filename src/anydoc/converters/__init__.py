@@ -9,6 +9,13 @@ from anydoc.converters.docx_text import (
     markdown_to_docx,
     register_docx_text,
 )
+from anydoc.converters.mailmerge import (
+    load_records,
+    merge_to_files,
+    merge_to_pdf,
+    merge_to_single,
+    template_fields,
+)
 from anydoc.converters.office_pdf import OFFICE_PDF_SOURCES, register_office_pdf
 from anydoc.converters.pdf_image import (
     IMAGE_FORMATS,
@@ -43,14 +50,19 @@ __all__ = [
     "json_to_csv",
     "json_to_xlsx",
     "load_builtin_converters",
+    "load_records",
     "make_thumbnail",
     "markdown_to_docx",
+    "merge_to_files",
+    "merge_to_pdf",
+    "merge_to_single",
     "pdf_to_images",
     "register_docx_text",
     "register_office_pdf",
     "register_pdf_image",
     "register_tabular",
     "render_preview",
+    "template_fields",
     "xlsx_to_csv",
     "xlsx_to_csv_files",
     "xlsx_to_json",
