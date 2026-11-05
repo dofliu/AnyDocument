@@ -22,6 +22,7 @@ from anydoc.core.registry import FormatHandler
 from anydoc.formats.docx import edit as _edit
 from anydoc.formats.docx import layout as _layout
 from anydoc.formats.docx import replace as _replace
+from anydoc.formats.docx import review as _review
 from anydoc.formats.docx import tables as _tables
 from anydoc.formats.docx import toc as _toc
 
@@ -258,6 +259,44 @@ class DocxDocument:
     def remove_toc(self) -> int:
         """Remove the table of contents; returns the number of paragraphs removed."""
         return _toc.remove_toc(self._doc)
+
+    # -- tracked changes and comments --------------------------------------
+
+    def revisions(self) -> list[_review.Revision]:
+        """List the tracked changes (insertions, deletions, moves, format changes)."""
+        return _review.list_revisions(self._doc)
+
+    def has_revisions(self) -> bool:
+        """Return whether the document contains tracked changes."""
+        return _review.has_revisions(self._doc)
+
+    def accept_revisions(self, **opts: Any) -> int:
+        """Accept tracked changes (all, or by ``author``/``ids``); returns the count."""
+        return _review.accept_revisions(self._doc, **opts)
+
+    def reject_revisions(self, **opts: Any) -> int:
+        """Reject tracked changes (all, or by ``author``/``ids``); returns the count."""
+        return _review.reject_revisions(self._doc, **opts)
+
+    def track_changes(self) -> bool:
+        """Return whether the *Track Changes* setting is on."""
+        return _review.is_tracking(self._doc)
+
+    def set_track_changes(self, enabled: bool = True) -> None:
+        """Switch the *Track Changes* setting on or off."""
+        _review.set_tracking(self._doc, enabled)
+
+    def comments(self) -> list[_review.CommentInfo]:
+        """List the comments with their anchored text."""
+        return _review.list_comments(self._doc)
+
+    def add_comment(self, text: str, **opts: Any) -> _review.CommentInfo:
+        """Add a comment on a paragraph or matched text; see ``review.add_comment``."""
+        return _review.add_comment(self._doc, text, **opts)
+
+    def delete_comment(self, comment_id: int) -> None:
+        """Delete a comment and its anchors."""
+        _review.delete_comment(self._doc, comment_id)
 
     def footnotes(self) -> list[str]:
         """Return footnote texts (separators excluded), in id order."""

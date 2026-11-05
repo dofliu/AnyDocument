@@ -4,6 +4,7 @@
 
 | 日期 | 工作 | 結果 | 測試 | 報告 | 備註 |
 |------|------|------|------|------|------|
+| 2026-11-05 | T055 DOCX 追蹤修訂與註解 | ✅ 完成 | 924 passed, 2 skipped | [報告](test-reports/2026-11-05_T055.md) | anydoc.formats.docx.review（list_revisions 插入/刪除/移動/格式變更/段落標記/表格列，含作者日期文字；accept/reject_revisions 全部或依作者/編號，涵蓋本文與頁首頁尾、巢狀修訂、段落合併、格式還原；set/is_tracking；list_comments 含錨點文字、add_comment 依段落或比對文字、delete_comment）；DocxDocument 對應方法；無新增相依；限制：註解以整個 run 為錨點、無註解回覆與儲存格層級修訂 |
 | 2026-11-05 | T054 DOCX 目錄產生 | ✅ 完成 | 902 passed, 2 skipped | [報告](test-reports/2026-11-05_T054.md) | anydoc.formats.docx.toc（add_toc 插入 TOC 欄位 `\o "1-3" \h \z \u`，預填標題項目＋超連結書籤、開啟時 updateFields；add_static_toc 純段落目錄；toc_entries、toc_info、has_toc、remove_toc；自動建立 toc 1-9 與 TOC Heading 樣式、標題 _Toc 書籤、可指定插入位置/分頁）；DocxDocument 對應方法；無新增相依；LibreOffice 轉 PDF 驗證目錄可見；限制：靜態目錄無頁碼、欄位頁碼需開啟時更新 |
 | 2026-11-05 | T053 DOCX 頁首頁尾、分節、版面 | ✅ 完成 | 883 passed, 2 skipped | [報告](test-reports/2026-11-05_T053.md) | anydoc.formats.docx.layout（set_page_size 命名紙張 A3/A4/A5/B4/B5/Letter/Legal 與自訂尺寸、set_orientation 自動對調寬高、set_margins 含頁首頁尾距離與裝訂線、add_section 五種分節類型、set_header_footer 文字/對齊/格式，`{page}`/`{pages}` 轉為 PAGE/NUMPAGES 欄位、首頁不同與奇偶頁變體、header_footer_fields、section_info）；DocxDocument 對應方法（以節索引操作）；無新增相依；限制：長度回報四捨五入至 0.1 mm，頁碼欄位預留值為 1 |
 | 2026-11-04 | T052 DOCX 表格與圖片 | ✅ 完成 | 872 passed, 2 skipped | [報告](test-reports/2026-11-04_T052.md) | anydoc.formats.docx.tables（add_table 資料列/表頭/對齊/樣式、set_cell_text、merge_cells 水平垂直區塊、set_borders、shade_cell、add/delete 列欄、欄寬列高、add_image 尺寸保持比例/對齊）；DocxDocument 對應方法（以表格索引操作）；無新增相依；限制：欄寬列高有 twips 取整誤差 |
