@@ -17,6 +17,7 @@ from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.xlsx import edit as _edit
+from anydoc.formats.xlsx.formulas import FormulaEngine
 
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -112,6 +113,7 @@ class XlsxDocument:
         self._cached = cached
         self.path = path
         self._dirty = False
+        self._calc: dict[str, dict[str, Any]] | None = None
         self.metadata = self._build_metadata()
 
     @property
@@ -138,7 +140,31 @@ class XlsxDocument:
 
     def _touch(self) -> None:
         self._dirty = True
+        self._calc = None
         self.metadata = self._build_metadata()
+
+    # -- formula calculation (T061) ----------------------------------------
+
+    def calculate(self) -> dict[str, dict[str, Any]]:
+        """Evaluate every formula with the built-in engine.
+
+        Returns ``{sheet name: {coordinate: value}}`` for formula cells; errors appear as
+        text such as ``"#DIV/0!"``.  The results are also used by ``cells()``/``rows()``
+        for formulas that carry no cached value (e.g. newly written ones).
+        """
+        engine = FormulaEngine(self._wb)
+        self._calc = engine.calculate()
+        return {sheet: dict(values) for sheet, values in self._calc.items()}
+
+    def evaluate(self, formula: str, sheet: int | str = 0) -> Any:
+        """Evaluate formula text such as ``"=SUM(A1:A3)"`` in the context of a sheet."""
+        return FormulaEngine(self._wb).evaluate(formula, self._sheet(sheet).title)
+
+    def _computed(self, ws: Worksheet, coordinate: str, cached: Any) -> Any:
+        """Cached value, or (after ``calculate()``) the engine's result when none is cached."""
+        if cached is not None or self._calc is None:
+            return cached
+        return self._calc.get(ws.title, {}).get(coordinate)
 
     def set_cell(self, sheet: int | str, coordinate: str, value: Any) -> None:
         """Write a cell (``=...`` strings become formulas; ``None`` clears the value)."""
@@ -245,7 +271,7 @@ class XlsxDocument:
                 formula = value = None
                 if kind == "formula":
                     formula = str(cell.value)
-                    value = cached_ws[cell.coordinate].value
+                    value = self._computed(ws, cell.coordinate, cached_ws[cell.coordinate].value)
                 else:
                     value = cell.value
                 out.append(
@@ -268,10 +294,19 @@ class XlsxDocument:
 
     def rows(self, sheet: int | str = 0) -> list[list[Any]]:
         """Return the used range as rows of values (formulas replaced by cached values)."""
-        ws = self._cached_sheet(self._sheet(sheet))
-        if self._is_empty(ws):
+        src = self._sheet(sheet)
+        ws = self._cached_sheet(src)
+        if self._is_empty(ws) and self._is_empty(src):
             return []
-        return [list(r) for r in ws.iter_rows(values_only=True)]
+        return [
+            [
+                self._computed(src, c.coordinate, c.value)
+                if src[c.coordinate].data_type == "f"
+                else c.value
+                for c in row
+            ]
+            for row in ws.iter_rows()
+        ]
 
     def merged_cells(self, sheet: int | str = 0) -> list[str]:
         """Return merged ranges (e.g. ``A1:B2``) of a sheet."""
