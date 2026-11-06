@@ -1,5 +1,6 @@
 """XLSX handler: sheets, used ranges, cells, formulas, merged cells, styles, defined names."""
 
+from anydoc.formats.xlsx.formulas import FormulaEngine, evaluate_formula, evaluate_workbook
 from anydoc.formats.xlsx.handler import (
     CellInfo,
     DefinedNameInfo,
@@ -7,8 +8,6 @@ from anydoc.formats.xlsx.handler import (
     XlsxDocument,
     XlsxHandler,
 )
-
-from anydoc.formats.xlsx.formulas import FormulaEngine, evaluate_formula, evaluate_workbook
 
 __all__ = [
     "CellInfo",
