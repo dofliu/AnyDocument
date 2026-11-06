@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, ClassVar
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.cell.cell import Cell
 from openpyxl.worksheet.worksheet import Worksheet
 
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.xlsx import edit as _edit
 
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -109,6 +111,7 @@ class XlsxDocument:
         self._wb = wb
         self._cached = cached
         self.path = path
+        self._dirty = False
         self.metadata = self._build_metadata()
 
     @property
@@ -119,17 +122,93 @@ class XlsxDocument:
     # -- structure ---------------------------------------------------------
 
     def _sheet(self, sheet: int | str) -> Worksheet:
-        try:
-            ws: Worksheet = (
-                self._wb.worksheets[sheet] if isinstance(sheet, int) else self._wb[sheet]
-            )
-        except (KeyError, IndexError):
-            raise KeyError(f"No such sheet: {sheet!r}") from None
-        return ws
+        return _edit.get_sheet(self._wb, sheet)
 
     def _cached_sheet(self, ws: Worksheet) -> Worksheet:
+        if self._dirty:
+            # Re-derive the cached-values view from the edited workbook (new formulas
+            # have no cached result until a spreadsheet application recalculates them).
+            self._cached.close()
+            self._cached = load_workbook(io.BytesIO(self.to_bytes()), data_only=True)
+            self._dirty = False
         cached: Worksheet = self._cached[ws.title]
         return cached
+
+    # -- editing (T060) ----------------------------------------------------
+
+    def _touch(self) -> None:
+        self._dirty = True
+        self.metadata = self._build_metadata()
+
+    def set_cell(self, sheet: int | str, coordinate: str, value: Any) -> None:
+        """Write a cell (``=...`` strings become formulas; ``None`` clears the value)."""
+        _edit.set_cell(self._sheet(sheet), coordinate, value)
+        self._touch()
+
+    def set_range(self, sheet: int | str, top_left: str, rows: Sequence[Sequence[Any]]) -> str:
+        """Write a 2-D block starting at ``top_left``; return the range written."""
+        result = _edit.set_range(self._sheet(sheet), top_left, rows)
+        self._touch()
+        return result
+
+    def clear_range(self, sheet: int | str, cell_range: str) -> int:
+        """Clear values in a cell or range; return how many non-empty cells were cleared."""
+        n = _edit.clear_range(self._sheet(sheet), cell_range)
+        self._touch()
+        return n
+
+    def add_sheet(self, title: str, index: int | None = None) -> int:
+        """Add an empty sheet and return its index."""
+        ws = _edit.add_sheet(self._wb, title, index)
+        self._touch()
+        return int(self._wb.worksheets.index(ws))
+
+    def delete_sheet(self, sheet: int | str) -> None:
+        """Delete a sheet (the last remaining sheet cannot be deleted)."""
+        _edit.delete_sheet(self._wb, sheet)
+        self._touch()
+
+    def rename_sheet(self, sheet: int | str, title: str) -> None:
+        """Rename a sheet, updating formula references to it."""
+        _edit.rename_sheet(self._wb, sheet, title)
+        self._touch()
+
+    def copy_sheet(self, sheet: int | str, title: str) -> int:
+        """Duplicate a sheet right after the source and return the new index."""
+        ws = _edit.copy_sheet(self._wb, sheet, title)
+        self._touch()
+        return int(self._wb.worksheets.index(ws))
+
+    def move_sheet(self, sheet: int | str, index: int) -> None:
+        """Move a sheet to a 0-based position."""
+        _edit.move_sheet(self._wb, sheet, index)
+        self._touch()
+
+    def insert_rows(self, sheet: int | str, at: int, amount: int = 1) -> None:
+        """Insert blank rows before 1-based row ``at``."""
+        _edit.insert_rows(self._sheet(sheet), at, amount)
+        self._touch()
+
+    def delete_rows(self, sheet: int | str, at: int, amount: int = 1) -> None:
+        """Delete rows starting at 1-based row ``at``."""
+        _edit.delete_rows(self._sheet(sheet), at, amount)
+        self._touch()
+
+    def insert_cols(self, sheet: int | str, at: int, amount: int = 1) -> None:
+        """Insert blank columns before 1-based column ``at``."""
+        _edit.insert_cols(self._sheet(sheet), at, amount)
+        self._touch()
+
+    def delete_cols(self, sheet: int | str, at: int, amount: int = 1) -> None:
+        """Delete columns starting at 1-based column ``at``."""
+        _edit.delete_cols(self._sheet(sheet), at, amount)
+        self._touch()
+
+    def to_bytes(self) -> bytes:
+        """Serialize the workbook to XLSX bytes."""
+        buf = io.BytesIO()
+        self._wb.save(buf)
+        return buf.getvalue()
 
     @staticmethod
     def _is_empty(ws: Worksheet) -> bool:
@@ -282,6 +361,12 @@ class XlsxDocument:
         self._cached.close()
 
 
+def _blank_bytes(wb: Workbook) -> bytes:
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 class XlsxHandler(FormatHandler):
     """Handler for Excel ``.xlsx`` workbooks."""
 
@@ -289,7 +374,7 @@ class XlsxHandler(FormatHandler):
     extensions: ClassVar[tuple[str, ...]] = ("xlsx",)
     mime_types: ClassVar[tuple[str, ...]] = (_XLSX_MIME,)
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT}
+        {Capability.READ, Capability.WRITE, Capability.EDIT, Capability.EXTRACT_TEXT}
     )
 
     @classmethod
@@ -298,6 +383,12 @@ class XlsxHandler(FormatHandler):
         if path is not None and path.suffix.lower() == ".xlsx":
             return 0.9
         return 0.0
+
+    def create(self) -> XlsxDocument:
+        """Create a new workbook with one empty sheet (use ``save(path)`` to write it)."""
+        wb = Workbook()
+        cached = load_workbook(io.BytesIO(_blank_bytes(wb)), data_only=True)
+        return XlsxDocument(wb, cached)
 
     def open(self, source: Path | bytes) -> XlsxDocument:
         """Open an XLSX from a path or bytes; invalid packages raise ``CorruptFileError``."""
