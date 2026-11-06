@@ -17,6 +17,7 @@ from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.xlsx import edit as _edit
+from anydoc.formats.xlsx import style as _style
 from anydoc.formats.xlsx.formulas import FormulaEngine
 
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -229,6 +230,91 @@ class XlsxDocument:
         """Delete columns starting at 1-based column ``at``."""
         _edit.delete_cols(self._sheet(sheet), at, amount)
         self._touch()
+
+    # -- formatting and layout (T062) --------------------------------------
+
+    def set_number_format(self, sheet: int | str, cell_range: str, fmt: str) -> int:
+        """Apply a number format (preset such as ``percent`` or a code) to a range."""
+        n = _style.set_number_format(self._sheet(sheet), cell_range, fmt)
+        self._touch()
+        return n
+
+    def set_font(self, sheet: int | str, cell_range: str, **options: Any) -> int:
+        """Change font attributes (name, size, bold, italic, underline, strike, color)."""
+        n = _style.set_font(self._sheet(sheet), cell_range, **options)
+        self._touch()
+        return n
+
+    def set_fill(self, sheet: int | str, cell_range: str, color: str | None) -> int:
+        """Set a solid fill color (``None`` removes it)."""
+        n = _style.set_fill(self._sheet(sheet), cell_range, color)
+        self._touch()
+        return n
+
+    def set_alignment(self, sheet: int | str, cell_range: str, **options: Any) -> int:
+        """Change alignment (horizontal, vertical, wrap, indent, rotation, shrink)."""
+        n = _style.set_alignment(self._sheet(sheet), cell_range, **options)
+        self._touch()
+        return n
+
+    def set_border(
+        self, sheet: int | str, cell_range: str, style: str | None = "thin", **options: Any
+    ) -> int:
+        """Set borders (``color``, ``sides``, ``outline`` options); ``style=None`` removes."""
+        n = _style.set_border(self._sheet(sheet), cell_range, style, **options)
+        self._touch()
+        return n
+
+    def set_column_width(self, sheet: int | str, column: str | int, width: float) -> None:
+        """Set a column width in characters."""
+        _style.set_column_width(self._sheet(sheet), column, width)
+        self._touch()
+
+    def set_row_height(self, sheet: int | str, row: int, height: float) -> None:
+        """Set a row height in points."""
+        _style.set_row_height(self._sheet(sheet), row, height)
+        self._touch()
+
+    def auto_fit_columns(self, sheet: int | str = 0) -> dict[str, float]:
+        """Size columns to their content; return ``{column letter: width}``."""
+        widths = _style.auto_fit_columns(self._sheet(sheet))
+        self._touch()
+        return widths
+
+    def freeze_panes(self, sheet: int | str, cell: str | None) -> None:
+        """Freeze rows above / columns left of ``cell`` (``None`` unfreezes)."""
+        _style.freeze_panes(self._sheet(sheet), cell)
+        self._touch()
+
+    def set_hidden(
+        self,
+        sheet: int | str,
+        *,
+        rows: tuple[int, int] | None = None,
+        cols: tuple[str, str] | None = None,
+        hidden: bool = True,
+    ) -> None:
+        """Hide or unhide a row span and/or column span."""
+        _style.set_hidden(self._sheet(sheet), rows=rows, cols=cols, hidden=hidden)
+        self._touch()
+
+    def set_sheet_state(self, sheet: int | str, state: str) -> None:
+        """Set sheet visibility to ``visible``, ``hidden`` or ``veryHidden``."""
+        ws = self._sheet(sheet)
+        if state != "visible" and all(
+            w.sheet_state != "visible" for w in self._wb.worksheets if w is not ws
+        ):
+            raise ValueError("At least one sheet must remain visible")
+        _style.set_sheet_state(ws, state)
+        self._touch()
+
+    def cell_format(self, sheet: int | str, coordinate: str) -> dict[str, Any]:
+        """Return number format, font, fill, border and alignment of one cell."""
+        return _style.describe_cell(self._sheet(sheet), coordinate)
+
+    def layout(self, sheet: int | str = 0) -> dict[str, Any]:
+        """Return column widths, row heights, hidden rows/columns, freeze pane and state."""
+        return _style.describe_layout(self._sheet(sheet))
 
     def to_bytes(self) -> bytes:
         """Serialize the workbook to XLSX bytes."""
