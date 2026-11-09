@@ -16,6 +16,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.xlsx import data as _data
 from anydoc.formats.xlsx import edit as _edit
 from anydoc.formats.xlsx import style as _style
 from anydoc.formats.xlsx.formulas import FormulaEngine
@@ -307,6 +308,66 @@ class XlsxDocument:
             raise ValueError("At least one sheet must remain visible")
         _style.set_sheet_state(ws, state)
         self._touch()
+
+    # -- sorting, filtering, duplicates (T063) -----------------------------
+
+    def sort_range(
+        self,
+        sheet: int | str,
+        cell_range: str,
+        keys: Sequence[Any],
+        *,
+        has_header: bool = False,
+        case_sensitive: bool = False,
+    ) -> int:
+        """Sort a range by column keys (``"B"`` or ``("B", False)`` for descending)."""
+        n = _data.sort_range(
+            self._sheet(sheet),
+            cell_range,
+            keys,
+            has_header=has_header,
+            case_sensitive=case_sensitive,
+        )
+        self._touch()
+        return n
+
+    def remove_duplicates(
+        self,
+        sheet: int | str,
+        cell_range: str,
+        columns: Sequence[str | int] | None = None,
+        *,
+        has_header: bool = True,
+        case_sensitive: bool = False,
+    ) -> int:
+        """Remove duplicate rows from a range; return the number of rows removed."""
+        n = _data.remove_duplicates(
+            self._sheet(sheet),
+            cell_range,
+            columns,
+            has_header=has_header,
+            case_sensitive=case_sensitive,
+        )
+        self._touch()
+        return n
+
+    def set_auto_filter(
+        self, sheet: int | str, cell_range: str, criteria: dict[str | int, Any] | None = None
+    ) -> list[int]:
+        """Install an AutoFilter, optionally filtering by values; return hidden row numbers."""
+        hidden = _data.set_auto_filter(self._sheet(sheet), cell_range, criteria)
+        self._touch()
+        return hidden
+
+    def clear_auto_filter(self, sheet: int | str) -> int:
+        """Remove the AutoFilter and show the rows it hid."""
+        n = _data.clear_auto_filter(self._sheet(sheet))
+        self._touch()
+        return n
+
+    def auto_filter(self, sheet: int | str = 0) -> dict[str, Any] | None:
+        """Return the sheet's AutoFilter description, or ``None``."""
+        return _data.get_auto_filter(self._sheet(sheet))
 
     def cell_format(self, sheet: int | str, coordinate: str) -> dict[str, Any]:
         """Return number format, font, fill, border and alignment of one cell."""
