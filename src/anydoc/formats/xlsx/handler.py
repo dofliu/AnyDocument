@@ -19,6 +19,7 @@ from anydoc.core.registry import FormatHandler
 from anydoc.formats.xlsx import charts as _charts
 from anydoc.formats.xlsx import data as _data
 from anydoc.formats.xlsx import edit as _edit
+from anydoc.formats.xlsx import rules as _rules
 from anydoc.formats.xlsx import style as _style
 from anydoc.formats.xlsx.formulas import FormulaEngine
 
@@ -387,6 +388,48 @@ class XlsxDocument:
         n = _charts.remove_charts(self._sheet(sheet), index)
         self._touch()
         return n
+
+    # -- conditional formatting & data validation (T065) --------------------
+
+    def add_conditional_format(
+        self, sheet: int | str, cell_range: str, kind: str, **options: Any
+    ) -> int:
+        """Add a conditional-format rule; return its priority."""
+        prio = _rules.add_conditional_format(self._sheet(sheet), cell_range, kind, **options)
+        self._touch()
+        return prio
+
+    def conditional_formats(self, sheet: int | str = 0) -> list[dict[str, Any]]:
+        """Describe the conditional-format rules on a sheet."""
+        return _rules.list_conditional_formats(self._sheet(sheet))
+
+    def remove_conditional_formats(self, sheet: int | str, cell_range: str | None = None) -> int:
+        """Remove conditional formats on a range (or all); return rules removed."""
+        n = _rules.remove_conditional_formats(self._sheet(sheet), cell_range)
+        self._touch()
+        return n
+
+    def add_data_validation(
+        self, sheet: int | str, cell_range: str, kind: str, **options: Any
+    ) -> int:
+        """Add a data-validation rule; return its index on the sheet."""
+        idx = _rules.add_data_validation(self._sheet(sheet), cell_range, kind, **options)
+        self._touch()
+        return idx
+
+    def data_validations(self, sheet: int | str = 0) -> list[dict[str, Any]]:
+        """Describe the data-validation rules on a sheet."""
+        return _rules.list_data_validations(self._sheet(sheet))
+
+    def remove_data_validations(self, sheet: int | str, index: int | None = None) -> int:
+        """Remove one validation rule (by index) or all; return the number removed."""
+        n = _rules.remove_data_validations(self._sheet(sheet), index)
+        self._touch()
+        return n
+
+    def validate_value(self, sheet: int | str, coordinate: str, value: Any) -> bool:
+        """Return whether ``value`` satisfies the validation rules covering ``coordinate``."""
+        return _rules.check_value(self._sheet(sheet), coordinate, value)
 
     def cell_format(self, sheet: int | str, coordinate: str) -> dict[str, Any]:
         """Return number format, font, fill, border and alignment of one cell."""
