@@ -9,10 +9,12 @@ from typing import Any, ClassVar
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.util import Inches
 
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.pptx import slides as _slides
 
 _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
@@ -206,6 +208,62 @@ class PptxDocument:
     def close(self) -> None:
         """Release resources (nothing to close for python-pptx)."""
 
+    # -- slide management (T070) -------------------------------------------
+
+    def _touch(self) -> None:
+        self.metadata = self._build_metadata()
+
+    def add_slide(
+        self,
+        layout: int | str = 1,
+        *,
+        index: int | None = None,
+        title: str | None = None,
+        body: str | list[str] | None = None,
+        notes: str | None = None,
+    ) -> int:
+        """Add a slide from a layout (index or name); return its 0-based index."""
+        result = _slides.add_slide(
+            self._prs, layout, index=index, title=title, body=body, notes=notes
+        )
+        self._touch()
+        return result
+
+    def delete_slide(self, index: int) -> None:
+        """Delete the slide at 0-based ``index``."""
+        _slides.delete_slide(self._prs, index)
+        self._touch()
+
+    def duplicate_slide(self, index: int, *, to: int | None = None) -> int:
+        """Copy a slide (default: right after the source); return the copy's index."""
+        result = _slides.duplicate_slide(self._prs, index, to=to)
+        self._touch()
+        return result
+
+    def move_slide(self, index: int, to: int) -> None:
+        """Move a slide to a new 0-based position."""
+        _slides.move_slide(self._prs, index, to)
+        self._touch()
+
+    def reorder_slides(self, order: list[int]) -> None:
+        """Reorder all slides; ``order`` is a permutation of the current indexes."""
+        _slides.reorder_slides(self._prs, order)
+        self._touch()
+
+    def set_notes(self, index: int, text: str) -> None:
+        """Set the speaker notes of a slide (empty string clears them)."""
+        _slides.set_notes(self._prs, index, text)
+
+    def get_notes(self, index: int) -> str:
+        """Return the speaker notes of a slide."""
+        return _slides.get_notes(self._prs, index)
+
+    def to_bytes(self) -> bytes:
+        """Serialize the presentation to PPTX bytes."""
+        buf = io.BytesIO()
+        self._prs.save(buf)
+        return buf.getvalue()
+
 
 class PptxHandler(FormatHandler):
     """Handler for PowerPoint ``.pptx`` presentations."""
@@ -214,7 +272,7 @@ class PptxHandler(FormatHandler):
     extensions: ClassVar[tuple[str, ...]] = ("pptx",)
     mime_types: ClassVar[tuple[str, ...]] = (_PPTX_MIME,)
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT}
+        {Capability.READ, Capability.WRITE, Capability.EDIT, Capability.EXTRACT_TEXT}
     )
 
     @classmethod
@@ -223,6 +281,13 @@ class PptxHandler(FormatHandler):
         if path is not None and path.suffix.lower() == ".pptx":
             return 0.9
         return 0.0
+
+    def create(self) -> PptxDocument:
+        """Create an empty 16:9 presentation using the default template."""
+        prs = Presentation()
+        prs.slide_width = Inches(13.333)
+        prs.slide_height = Inches(7.5)
+        return PptxDocument(prs)
 
     def open(self, source: Path | bytes) -> PptxDocument:
         """Open a PPTX from a path or bytes; invalid packages raise ``CorruptFileError``."""
