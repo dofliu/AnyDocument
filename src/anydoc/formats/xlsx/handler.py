@@ -16,6 +16,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.xlsx import charts as _charts
 from anydoc.formats.xlsx import data as _data
 from anydoc.formats.xlsx import edit as _edit
 from anydoc.formats.xlsx import style as _style
@@ -368,6 +369,24 @@ class XlsxDocument:
     def auto_filter(self, sheet: int | str = 0) -> dict[str, Any] | None:
         """Return the sheet's AutoFilter description, or ``None``."""
         return _data.get_auto_filter(self._sheet(sheet))
+
+    # -- charts (T064) -----------------------------------------------------
+
+    def add_chart(self, sheet: int | str, kind: str, data: str, **options: Any) -> int:
+        """Add a bar/column/line/pie/scatter chart; return its index on the sheet."""
+        idx = _charts.add_chart(self._sheet(sheet), kind, data, **options)
+        self._touch()
+        return idx
+
+    def charts(self, sheet: int | str = 0) -> list[dict[str, Any]]:
+        """Describe the charts on a sheet."""
+        return _charts.list_charts(self._sheet(sheet))
+
+    def remove_charts(self, sheet: int | str, index: int | None = None) -> int:
+        """Remove one chart (by index) or all charts; return the number removed."""
+        n = _charts.remove_charts(self._sheet(sheet), index)
+        self._touch()
+        return n
 
     def cell_format(self, sheet: int | str, coordinate: str) -> dict[str, Any]:
         """Return number format, font, fill, border and alignment of one cell."""
