@@ -19,6 +19,7 @@ from anydoc.core.registry import FormatHandler
 from anydoc.formats.xlsx import charts as _charts
 from anydoc.formats.xlsx import data as _data
 from anydoc.formats.xlsx import edit as _edit
+from anydoc.formats.xlsx import pivot as _pivot
 from anydoc.formats.xlsx import rules as _rules
 from anydoc.formats.xlsx import style as _style
 from anydoc.formats.xlsx.formulas import FormulaEngine
@@ -370,6 +371,50 @@ class XlsxDocument:
     def auto_filter(self, sheet: int | str = 0) -> dict[str, Any] | None:
         """Return the sheet's AutoFilter description, or ``None``."""
         return _data.get_auto_filter(self._sheet(sheet))
+
+    # -- pivot tables (T066) -----------------------------------------------
+
+    def pivot_table(
+        self,
+        sheet: int | str,
+        source_range: str,
+        target_title: str,
+        *,
+        rows: Sequence[str],
+        columns: Sequence[str] = (),
+        values: Sequence[str | tuple[str, str]],
+        totals: bool = True,
+        filters: dict[str, Any] | None = None,
+    ) -> int:
+        """Compute a pivot table from ``source_range`` (with header row) into a new sheet.
+
+        Returns the new sheet index. ``values`` items are a field name (sum) or
+        ``(field, aggregate)`` with aggregate one of sum/count/average/min/max/median.
+        """
+        ws = self._sheet(sheet)
+        computed = self.calculate().get(ws.title) if self._has_formulas(ws) else None
+        out = _pivot.pivot_table(
+            self._wb,
+            ws,
+            source_range,
+            target_title,
+            rows=rows,
+            columns=columns,
+            values=values,
+            totals=totals,
+            filters=filters,
+            computed=computed,
+        )
+        self._touch()
+        return int(self._wb.worksheets.index(out))
+
+    @staticmethod
+    def _has_formulas(ws: Worksheet) -> bool:
+        return any(
+            isinstance(c.value, str) and c.value.startswith("=")
+            for row in ws.iter_rows()
+            for c in row
+        )
 
     # -- charts (T064) -----------------------------------------------------
 
