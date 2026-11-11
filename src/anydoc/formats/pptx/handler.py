@@ -19,9 +19,11 @@ from anydoc.formats.pptx import charts as _charts
 from anydoc.formats.pptx import shapes as _shapes
 from anydoc.formats.pptx import slides as _slides
 from anydoc.formats.pptx import tables as _tables
+from anydoc.formats.pptx import themes as _themes
 from anydoc.formats.pptx.charts import ChartInfo, SeriesInput
 from anydoc.formats.pptx.shapes import Length, ShapeFormat
 from anydoc.formats.pptx.tables import TableCellFormat, TableInfo
+from anydoc.formats.pptx.themes import LayoutInfo, MasterInfo, TextStyle, ThemeInfo
 
 _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
@@ -534,6 +536,91 @@ class PptxDocument:
         """Return kind, titles, categories, series and legend of a chart."""
         return _charts.chart_info(self._prs, slide, shape_id)
 
+    # -- layouts, masters and themes (T073) --------------------------------
+
+    def layout_info(self) -> list[LayoutInfo]:
+        """Return every layout (all masters) with placeholders and the slides using it."""
+        return _themes.list_layouts(self._prs)
+
+    def masters(self) -> list[MasterInfo]:
+        """Return every slide master with its theme name, layouts and placeholders."""
+        return _themes.list_masters(self._prs)
+
+    def set_slide_layout(
+        self, slide: int, layout: int | str, *, keep_positions: bool = False
+    ) -> None:
+        """Switch a slide to another layout (index or name), re-binding its placeholders."""
+        _themes.set_slide_layout(self._prs, slide, layout, keep_positions=keep_positions)
+        self._touch()
+
+    def rename_layout(self, layout: int | str, name: str) -> None:
+        """Rename a layout."""
+        _themes.rename_layout(self._prs, layout, name)
+        self._touch()
+
+    def remove_unused_layouts(self) -> list[str]:
+        """Delete layouts no slide uses; return their names."""
+        result = _themes.remove_unused_layouts(self._prs)
+        self._touch()
+        return result
+
+    def set_background(
+        self,
+        color: str | None,
+        *,
+        slide: int | None = None,
+        layout: int | str | None = None,
+        master: int | None = None,
+    ) -> None:
+        """Set a solid background on a slide, layout or master (default: all masters)."""
+        _themes.set_background(self._prs, color, slide=slide, layout=layout, master=master)
+
+    def get_background(
+        self,
+        *,
+        slide: int | None = None,
+        layout: int | str | None = None,
+        master: int | None = None,
+    ) -> str | None:
+        """Return the target's own solid background colour (``None`` when inherited)."""
+        return _themes.get_background(self._prs, slide=slide, layout=layout, master=master)
+
+    def set_master_text_style(self, kind: str, **options: Any) -> None:
+        """Change the master's default title/body text formatting (see ``themes``)."""
+        _themes.set_master_text_style(self._prs, kind, **options)
+
+    def master_text_style(self, kind: str, *, level: int = 1, master: int = 0) -> TextStyle:
+        """Return the master's default run formatting for ``kind`` at ``level``."""
+        return _themes.master_text_style(self._prs, kind, level=level, master=master)
+
+    def theme(self, master: int = 0) -> ThemeInfo:
+        """Return the theme (name, colours, fonts) of a slide master."""
+        return _themes.theme_info(self._prs, master)
+
+    def set_theme_colors(self, colors: dict[str, str], *, master: int | None = None) -> None:
+        """Change theme scheme colours (``accent1`` ... ``RRGGBB``)."""
+        _themes.set_theme_colors(self._prs, colors, master=master)
+
+    def set_theme_fonts(self, **fonts: Any) -> None:
+        """Change the theme's heading/body fonts (see ``themes.set_theme_fonts``)."""
+        _themes.set_theme_fonts(self._prs, **fonts)
+
+    def apply_theme(self, source: Any, **options: Any) -> ThemeInfo:
+        """Copy the theme (colours, fonts, effects) of another presentation."""
+        return _themes.apply_theme(self._prs, source, **options)
+
+    def set_slide_size(self, size: Any, *, scale: bool = True) -> tuple[int, int]:
+        """Change the slide size (``16:9``, ``4:3``, ``16:10``, ``A4`` or width/height)."""
+        result = _themes.set_slide_size(self._prs, size, scale=scale)
+        self._touch()
+        return result
+
+    def to_outline(self) -> dict[str, Any]:
+        """Export the presentation as an outline (see ``anydoc.formats.pptx.outline``)."""
+        from anydoc.formats.pptx import outline as _outline
+
+        return _outline.export_outline(self._prs)
+
     def to_bytes(self) -> bytes:
         """Serialize the presentation to PPTX bytes."""
         buf = io.BytesIO()
@@ -563,6 +650,22 @@ class PptxHandler(FormatHandler):
         prs = Presentation()
         prs.slide_width = Inches(13.333)
         prs.slide_height = Inches(7.5)
+        return PptxDocument(prs)
+
+    def from_outline(
+        self,
+        outline: dict[str, Any] | Path,
+        *,
+        template: Path | bytes | None = None,
+    ) -> PptxDocument:
+        """Build a presentation from an outline (object or JSON file) and a template."""
+        from anydoc.formats.pptx import outline as _outline
+
+        base_dir: Path | None = None
+        if isinstance(outline, Path):
+            base_dir = outline.resolve().parent
+            outline = _outline.load_outline(outline)
+        prs = _outline.build_presentation(outline, template=template, base_dir=base_dir)
         return PptxDocument(prs)
 
     def open(self, source: Path | bytes) -> PptxDocument:

@@ -848,3 +848,104 @@ def mailmerge(
         raise _fail(f"file not found: {exc.args[0]}", 2) from None
     except (AnyDocError, ValueError) as exc:
         raise _fail(str(exc)) from None
+
+
+pptx_app = typer.Typer(help="PowerPoint layouts, themes and outline builds.", no_args_is_help=True)
+app.add_typer(pptx_app, name="pptx")
+
+
+def _open_pptx(path: Path) -> Any:
+    from anydoc.formats.pptx import PptxHandler
+
+    if not path.is_file():
+        raise _fail(f"file not found: {path}", 2)
+    try:
+        return PptxHandler().open(path)
+    except AnyDocError as exc:
+        raise _fail(str(exc)) from None
+
+
+@pptx_app.command("build")
+def pptx_build(
+    outline: Annotated[Path, typer.Argument(help="Outline JSON file.")],
+    output: Annotated[Path, typer.Argument(help="Output .pptx path.")],
+    template: Annotated[
+        Path | None,
+        typer.Option("--template", "-t", help="PPTX template (masters, layouts, theme)."),
+    ] = None,
+) -> None:
+    """Build a presentation from an outline JSON, optionally using a template."""
+    from anydoc.formats.pptx import outline as _outline
+
+    for path in (outline, template):
+        if path is not None and not path.is_file():
+            raise _fail(f"file not found: {path}", 2)
+    try:
+        _outline.outline_to_pptx(outline, output, template=template)
+    except (AnyDocError, ValueError, IndexError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    typer.echo(str(output))
+
+
+@pptx_app.command("outline")
+def pptx_outline(
+    file: FileArg,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write the JSON to this file.")
+    ] = None,
+) -> None:
+    """Export a presentation as an outline JSON (titles, bullets, tables, charts, notes)."""
+    data = _open_pptx(file).to_outline()
+    if output is None:
+        _dump(data)
+    else:
+        output.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        typer.echo(str(output))
+
+
+@pptx_app.command("layouts")
+def pptx_layouts(file: FileArg) -> None:
+    """List slide layouts with their placeholders and the slides using them (JSON)."""
+    from dataclasses import asdict
+
+    _dump([asdict(item) for item in _open_pptx(file).layout_info()])
+
+
+@pptx_app.command("theme")
+def pptx_theme(
+    file: FileArg,
+    apply: Annotated[
+        Path | None, typer.Option("--apply", help="Copy the theme of this presentation.")
+    ] = None,
+    color: Annotated[
+        list[str] | None,
+        typer.Option("--color", "-c", help="Set a theme colour, e.g. accent1=1F4E79."),
+    ] = None,
+    major_font: Annotated[str | None, typer.Option("--major-font", help="Heading font.")] = None,
+    minor_font: Annotated[str | None, typer.Option("--minor-font", help="Body font.")] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Output path (required to change).")
+    ] = None,
+) -> None:
+    """Show the theme (JSON), or change it and write the result to --output."""
+    from dataclasses import asdict
+
+    doc = _open_pptx(file)
+    changing = bool(apply or color or major_font or minor_font)
+    if changing and output is None:
+        raise _fail("--output is required when changing the theme", 2)
+    try:
+        if apply is not None:
+            doc.apply_theme(apply)
+        if color:
+            pairs = [item.partition("=") for item in color]
+            if any(not sep or not value for _, sep, value in pairs):
+                raise ValueError("--color expects NAME=RRGGBB")
+            doc.set_theme_colors({name.strip(): value.strip() for name, _, value in pairs})
+        if major_font or minor_font:
+            doc.set_theme_fonts(major=major_font, minor=minor_font)
+        if changing and output is not None:
+            doc.save(output)
+    except (AnyDocError, ValueError, OSError) as exc:
+        raise _fail(str(exc)) from None
+    _dump(asdict(doc.theme()))
