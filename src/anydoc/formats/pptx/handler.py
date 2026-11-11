@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
@@ -14,7 +15,9 @@ from pptx.util import Inches
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.pptx import shapes as _shapes
 from anydoc.formats.pptx import slides as _slides
+from anydoc.formats.pptx.shapes import Length, ShapeFormat
 
 _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
@@ -257,6 +260,133 @@ class PptxDocument:
     def get_notes(self, index: int) -> str:
         """Return the speaker notes of a slide."""
         return _slides.get_notes(self._prs, index)
+
+    # -- text, pictures and shapes (T071) ----------------------------------
+
+    def add_textbox(
+        self,
+        slide: int,
+        text: str | Sequence[str],
+        *,
+        left: Length,
+        top: Length,
+        width: Length,
+        height: Length,
+        **options: Any,
+    ) -> int:
+        """Add a text box; return its shape id (options: see ``shapes.add_textbox``)."""
+        return _shapes.add_textbox(
+            self._prs, slide, text, left=left, top=top, width=width, height=height, **options
+        )
+
+    def set_shape_text(self, slide: int, shape_id: int, text: str | Sequence[str]) -> None:
+        """Replace the text of a shape (string or list of paragraphs)."""
+        _shapes.set_text(self._prs, slide, shape_id, text)
+        self._touch()
+
+    def add_shape_paragraph(self, slide: int, shape_id: int, text: str, **options: Any) -> int:
+        """Append a paragraph to a shape; return its index (see ``shapes.add_paragraph``)."""
+        return _shapes.add_paragraph(self._prs, slide, shape_id, text, **options)
+
+    def format_text(self, slide: int, shape_id: int, **options: Any) -> None:
+        """Format a shape's text (font, colour, alignment…; see ``shapes.format_text``)."""
+        _shapes.format_text(self._prs, slide, shape_id, **options)
+
+    def add_picture(
+        self,
+        slide: int,
+        image: Path | str | bytes,
+        *,
+        left: Length,
+        top: Length,
+        width: Length | None = None,
+        height: Length | None = None,
+    ) -> int:
+        """Insert a picture (aspect ratio kept when one dimension is given); return its id."""
+        return _shapes.add_picture(
+            self._prs, slide, image, left=left, top=top, width=width, height=height
+        )
+
+    def add_shape(
+        self,
+        slide: int,
+        kind: str,
+        *,
+        left: Length,
+        top: Length,
+        width: Length,
+        height: Length,
+        **options: Any,
+    ) -> int:
+        """Add a basic auto shape (``shapes.SHAPE_KINDS``); return its shape id."""
+        return _shapes.add_shape(
+            self._prs, slide, kind, left=left, top=top, width=width, height=height, **options
+        )
+
+    def add_line(
+        self,
+        slide: int,
+        *,
+        x1: Length,
+        y1: Length,
+        x2: Length,
+        y2: Length,
+        color: str | None = None,
+        width: float | None = None,
+    ) -> int:
+        """Add a straight line; return its shape id."""
+        return _shapes.add_line(
+            self._prs, slide, x1=x1, y1=y1, x2=x2, y2=y2, color=color, width=width
+        )
+
+    def style_shape(
+        self,
+        slide: int,
+        shape_id: int,
+        *,
+        fill: str | None = None,
+        line_color: str | None = None,
+        line_width: float | None = None,
+    ) -> None:
+        """Set fill colour, outline colour (``"none"`` removes) and outline width (pt)."""
+        _shapes.style_shape(
+            self._prs, slide, shape_id, fill=fill, line_color=line_color, line_width=line_width
+        )
+
+    def set_geometry(
+        self,
+        slide: int,
+        shape_id: int,
+        *,
+        left: Length | None = None,
+        top: Length | None = None,
+        width: Length | None = None,
+        height: Length | None = None,
+        rotation: float | None = None,
+    ) -> None:
+        """Move, resize and/or rotate a shape; omitted values are kept."""
+        _shapes.set_geometry(
+            self._prs,
+            slide,
+            shape_id,
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            rotation=rotation,
+        )
+
+    def delete_shape(self, slide: int, shape_id: int) -> None:
+        """Remove a shape from a slide."""
+        _shapes.delete_shape(self._prs, slide, shape_id)
+
+    def set_z_order(self, slide: int, shape_id: int, position: int | str) -> None:
+        """Restack a shape: ``"front"``, ``"back"`` or a 0-based position (0 = bottom)."""
+        _shapes.set_z_order(self._prs, slide, shape_id, position)
+
+    def shape_format(self, slide: int, shape_id: int) -> ShapeFormat:
+        """Return geometry, fill/outline and text formatting of a shape."""
+        return _shapes.shape_format(self._prs, slide, shape_id)
 
     def to_bytes(self) -> bytes:
         """Serialize the presentation to PPTX bytes."""
