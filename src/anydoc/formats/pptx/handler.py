@@ -15,9 +15,13 @@ from pptx.util import Inches
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.pptx import charts as _charts
 from anydoc.formats.pptx import shapes as _shapes
 from anydoc.formats.pptx import slides as _slides
+from anydoc.formats.pptx import tables as _tables
+from anydoc.formats.pptx.charts import ChartInfo, SeriesInput
 from anydoc.formats.pptx.shapes import Length, ShapeFormat
+from anydoc.formats.pptx.tables import TableCellFormat, TableInfo
 
 _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
@@ -387,6 +391,148 @@ class PptxDocument:
     def shape_format(self, slide: int, shape_id: int) -> ShapeFormat:
         """Return geometry, fill/outline and text formatting of a shape."""
         return _shapes.shape_format(self._prs, slide, shape_id)
+
+    # -- tables (T072) ------------------------------------------------------
+
+    def add_table(
+        self,
+        slide: int,
+        data: Sequence[Sequence[Any]] | None = None,
+        *,
+        left: Length,
+        top: Length,
+        width: Length,
+        **options: Any,
+    ) -> int:
+        """Add a table from rows of values; return its shape id (see ``tables.add_table``)."""
+        result = _tables.add_table(
+            self._prs, slide, data, left=left, top=top, width=width, **options
+        )
+        self._touch()
+        return result
+
+    def set_table_cell(self, slide: int, shape_id: int, row: int, col: int, value: Any) -> None:
+        """Set the text of one table cell."""
+        _tables.set_cell(self._prs, slide, shape_id, row, col, value)
+
+    def set_table_data(
+        self, slide: int, shape_id: int, data: Sequence[Sequence[Any]], **options: Any
+    ) -> None:
+        """Write a block of values into a table (options: see ``tables.set_data``)."""
+        _tables.set_data(self._prs, slide, shape_id, data, **options)
+
+    def insert_table_row(
+        self,
+        slide: int,
+        shape_id: int,
+        index: int | None = None,
+        values: Sequence[Any] | None = None,
+    ) -> int:
+        """Insert a table row before ``index`` (default: append); return its index."""
+        return _tables.insert_row(self._prs, slide, shape_id, index, values)
+
+    def delete_table_row(self, slide: int, shape_id: int, index: int) -> None:
+        """Delete a table row."""
+        _tables.delete_row(self._prs, slide, shape_id, index)
+
+    def insert_table_column(
+        self,
+        slide: int,
+        shape_id: int,
+        index: int | None = None,
+        values: Sequence[Any] | None = None,
+        *,
+        width: Length | None = None,
+    ) -> int:
+        """Insert a table column before ``index`` (default: append); return its index."""
+        return _tables.insert_column(self._prs, slide, shape_id, index, values, width=width)
+
+    def delete_table_column(self, slide: int, shape_id: int, index: int) -> None:
+        """Delete a table column."""
+        _tables.delete_column(self._prs, slide, shape_id, index)
+
+    def set_table_column_width(self, slide: int, shape_id: int, col: int, width: Length) -> None:
+        """Set the width of a table column."""
+        _tables.set_column_width(self._prs, slide, shape_id, col, width)
+
+    def set_table_row_height(self, slide: int, shape_id: int, row: int, height: Length) -> None:
+        """Set the (minimum) height of a table row."""
+        _tables.set_row_height(self._prs, slide, shape_id, row, height)
+
+    def merge_table_cells(
+        self, slide: int, shape_id: int, row1: int, col1: int, row2: int, col2: int
+    ) -> None:
+        """Merge the rectangle of table cells between two corners."""
+        _tables.merge_cells(self._prs, slide, shape_id, row1, col1, row2, col2)
+
+    def unmerge_table_cells(self, slide: int, shape_id: int, row: int, col: int) -> None:
+        """Split the merged region whose top-left cell is ``(row, col)``."""
+        _tables.unmerge_cells(self._prs, slide, shape_id, row, col)
+
+    def format_table_cells(self, slide: int, shape_id: int, **options: Any) -> None:
+        """Format table cells (rows/cols selection, font, align, anchor, fill)."""
+        _tables.format_cells(self._prs, slide, shape_id, **options)
+
+    def set_table_options(self, slide: int, shape_id: int, **options: Any) -> None:
+        """Toggle header row, banded rows and first-column emphasis of a table."""
+        _tables.set_table_options(self._prs, slide, shape_id, **options)
+
+    def table_info(self, slide: int, shape_id: int) -> TableInfo:
+        """Return size, content, column widths, row heights and merges of a table."""
+        return _tables.table_info(self._prs, slide, shape_id)
+
+    def table_cell_format(self, slide: int, shape_id: int, row: int, col: int) -> TableCellFormat:
+        """Return fill, anchor and text formatting of one table cell."""
+        return _tables.cell_format(self._prs, slide, shape_id, row, col)
+
+    # -- charts (T072) ------------------------------------------------------
+
+    def add_chart(
+        self,
+        slide: int,
+        kind: str,
+        categories: Sequence[Any] | None,
+        series: SeriesInput,
+        *,
+        left: Length,
+        top: Length,
+        width: Length,
+        height: Length,
+        **options: Any,
+    ) -> int:
+        """Add a native chart; return its shape id (options: see ``charts.add_chart``)."""
+        result = _charts.add_chart(
+            self._prs,
+            slide,
+            kind,
+            categories,
+            series,
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            **options,
+        )
+        self._touch()
+        return result
+
+    def set_chart_options(self, slide: int, shape_id: int, **options: Any) -> None:
+        """Change titles, legend, data labels and colours of a chart."""
+        _charts.set_chart_options(self._prs, slide, shape_id, **options)
+
+    def update_chart_data(
+        self,
+        slide: int,
+        shape_id: int,
+        categories: Sequence[Any] | None,
+        series: SeriesInput,
+    ) -> None:
+        """Replace the categories and series of a chart."""
+        _charts.update_chart_data(self._prs, slide, shape_id, categories, series)
+
+    def chart_info(self, slide: int, shape_id: int) -> ChartInfo:
+        """Return kind, titles, categories, series and legend of a chart."""
+        return _charts.chart_info(self._prs, slide, shape_id)
 
     def to_bytes(self) -> bytes:
         """Serialize the presentation to PPTX bytes."""
