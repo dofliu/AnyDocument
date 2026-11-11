@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
@@ -18,6 +19,9 @@ from anydoc.formats.csv.parse import (
     parse_rows,
     sniff_delimiter,
 )
+
+if TYPE_CHECKING:
+    from anydoc.formats.csv.ops import AggSpec, ColumnRef, Condition, SortKey
 
 
 class CsvDocument:
@@ -82,6 +86,104 @@ class CsvDocument:
                 "column_types": self.column_types,
             },
         )
+
+    def refresh(self) -> None:
+        """Rebuild ``metadata`` after the header or rows were changed."""
+        self.metadata = self._build_metadata()
+
+    # -- data operations (T080); see ``anydoc.formats.csv.ops`` for details ------------
+
+    def column_names(self) -> list[str]:
+        """Return one name per column (``colN`` where the header is missing or blank)."""
+        from anydoc.formats.csv import ops
+
+        return ops.column_names(self)
+
+    def filter_rows(
+        self,
+        conditions: Condition | list[Condition],
+        *,
+        match: str = "all",
+        invert: bool = False,
+    ) -> int:
+        """Keep rows matching the conditions (e.g. ``"分數>=80"``); return rows removed."""
+        from anydoc.formats.csv import ops
+
+        return ops.filter_rows(self, conditions, match=match, invert=invert)
+
+    def sort_rows(
+        self,
+        keys: SortKey | list[SortKey],
+        *,
+        descending: bool = False,
+        ignore_case: bool = False,
+    ) -> None:
+        """Sort rows in place by one or more columns (``"name"`` or ``"name:desc"``)."""
+        from anydoc.formats.csv import ops
+
+        ops.sort_rows(self, keys, descending=descending, ignore_case=ignore_case)
+
+    def dedupe(
+        self,
+        columns: Sequence[ColumnRef] | None = None,
+        *,
+        keep: str = "first",
+        ignore_case: bool = False,
+    ) -> int:
+        """Remove duplicate rows (compared on ``columns``); return rows removed."""
+        from anydoc.formats.csv import ops
+
+        return ops.dedupe(self, columns, keep=keep, ignore_case=ignore_case)
+
+    def select_columns(self, columns: Sequence[ColumnRef]) -> None:
+        """Keep only ``columns``, in the given order."""
+        from anydoc.formats.csv import ops
+
+        ops.select_columns(self, columns)
+
+    def drop_columns(self, columns: Sequence[ColumnRef]) -> None:
+        """Remove ``columns``."""
+        from anydoc.formats.csv import ops
+
+        ops.drop_columns(self, columns)
+
+    def rename_columns(self, mapping: Mapping[ColumnRef, str]) -> None:
+        """Rename columns (``{old: new}``)."""
+        from anydoc.formats.csv import ops
+
+        ops.rename_columns(self, mapping)
+
+    def join(
+        self,
+        other: CsvDocument,
+        on: ColumnRef | Sequence[ColumnRef],
+        *,
+        right_on: ColumnRef | Sequence[ColumnRef] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+    ) -> CsvDocument:
+        """Join with ``other`` on key column(s); return a new table."""
+        from anydoc.formats.csv import ops
+
+        return ops.join(self, other, on, right_on=right_on, how=how, suffix=suffix)
+
+    def group_by(
+        self,
+        by: ColumnRef | Sequence[ColumnRef],
+        aggregates: AggSpec | list[AggSpec],
+        *,
+        sort: bool = True,
+    ) -> CsvDocument:
+        """Group rows and compute aggregates (e.g. ``"sum:金額"``); return a new table."""
+        from anydoc.formats.csv import ops
+
+        return ops.group_by(self, by, aggregates, sort=sort)
+
+    def describe(self, columns: Sequence[ColumnRef] | None = None) -> list[dict[str, Any]]:
+        """Return per-column statistics (count, empty, unique, min, max, sum, mean...)."""
+        from anydoc.formats.csv import ops
+
+        return ops.describe(self, columns)
 
     def parts(self) -> list[Part]:
         """Return a single table part sized ``(columns, rows)``."""

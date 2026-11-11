@@ -949,3 +949,226 @@ def pptx_theme(
     except (AnyDocError, ValueError, OSError) as exc:
         raise _fail(str(exc)) from None
     _dump(asdict(doc.theme()))
+
+
+csv_app = typer.Typer(
+    help="CSV/TSV data operations: filter, sort, dedupe, select, join, group, stats.",
+    no_args_is_help=True,
+)
+app.add_typer(csv_app, name="csv")
+
+CsvOutput = Annotated[
+    Path | None,
+    typer.Option("--output", "-o", help="Write the result to this file (default: stdout)."),
+]
+CsvEncoding = Annotated[
+    str | None,
+    typer.Option("--encoding", help="Output encoding (default: same as the input file)."),
+]
+_CSV_ERRORS = (AnyDocError, ValueError, LookupError, OSError)
+
+
+def _open_csv(path: Path) -> Any:
+    from anydoc.formats.csv import CsvHandler, TsvHandler
+
+    if not path.is_file():
+        raise _fail(f"file not found: {path}", 2)
+    handler = TsvHandler() if path.suffix.lower() in (".tsv", ".tab") else CsvHandler()
+    try:
+        return handler.open(path)
+    except AnyDocError as exc:
+        raise _fail(str(exc)) from None
+
+
+def _emit_csv(doc: Any, output: Path | None, encoding: str | None) -> None:
+    """Write ``doc`` to ``output`` (delimiter follows the extension) or print it as UTF-8."""
+    if output is None:
+        typer.echo(doc.to_bytes(encoding="utf-8").decode("utf-8"), nl=False)
+        return
+    suffix = output.suffix.lower()
+    delimiter = None
+    if suffix in (".tsv", ".tab"):
+        delimiter = "\t"
+    elif suffix == ".csv" and doc.delimiter == "\t":
+        delimiter = ","
+    doc.save(output, encoding=encoding, delimiter=delimiter)
+    typer.echo(str(output))
+
+
+def _pairs(items: list[str], option: str) -> dict[str, str]:
+    pairs = [item.partition("=") for item in items]
+    if any(not sep or not old.strip() or not new.strip() for old, sep, new in pairs):
+        raise ValueError(f"{option} expects OLD=NEW")
+    return {old.strip(): new.strip() for old, _, new in pairs}
+
+
+@csv_app.command("filter")
+def csv_filter(
+    file: FileArg,
+    where: Annotated[
+        list[str],
+        typer.Option("--where", "-w", help="Condition, e.g. '分數>=80', 'name~wang', 'city=台北'."),
+    ],
+    any_: Annotated[bool, typer.Option("--any", help="Match any condition (OR).")] = False,
+    invert: Annotated[bool, typer.Option("--invert", help="Keep non-matching rows.")] = False,
+    output: CsvOutput = None,
+    encoding: CsvEncoding = None,
+) -> None:
+    """Keep the rows matching the conditions (operators: = != > >= < <= ~ !~ =~)."""
+    doc = _open_csv(file)
+    try:
+        removed = doc.filter_rows(list(where), match="any" if any_ else "all", invert=invert)
+        typer.echo(f"kept {len(doc.rows)} rows, removed {removed}", err=True)
+        _emit_csv(doc, output, encoding)
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None
+
+
+@csv_app.command("sort")
+def csv_sort(
+    file: FileArg,
+    by: Annotated[
+        list[str], typer.Option("--by", "-k", help="Sort column; append :desc to reverse.")
+    ],
+    descending: Annotated[bool, typer.Option("--desc", help="Descending by default.")] = False,
+    ignore_case: Annotated[bool, typer.Option("--ignore-case", help="Ignore letter case.")] = False,
+    output: CsvOutput = None,
+    encoding: CsvEncoding = None,
+) -> None:
+    """Sort rows by one or more columns (numbers and dates by value, blanks last)."""
+    doc = _open_csv(file)
+    try:
+        doc.sort_rows(list(by), descending=descending, ignore_case=ignore_case)
+        _emit_csv(doc, output, encoding)
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None
+
+
+@csv_app.command("dedupe")
+def csv_dedupe(
+    file: FileArg,
+    column: Annotated[
+        list[str] | None,
+        typer.Option("--column", "-c", help="Compare only these columns (default: all)."),
+    ] = None,
+    keep: Annotated[str, typer.Option("--keep", help="Occurrence to keep: first or last.")] = (
+        "first"
+    ),
+    ignore_case: Annotated[bool, typer.Option("--ignore-case", help="Ignore letter case.")] = False,
+    output: CsvOutput = None,
+    encoding: CsvEncoding = None,
+) -> None:
+    """Remove duplicate rows."""
+    doc = _open_csv(file)
+    try:
+        removed = doc.dedupe(column or None, keep=keep, ignore_case=ignore_case)
+        typer.echo(f"kept {len(doc.rows)} rows, removed {removed}", err=True)
+        _emit_csv(doc, output, encoding)
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None
+
+
+@csv_app.command("select")
+def csv_select(
+    file: FileArg,
+    column: Annotated[
+        list[str] | None,
+        typer.Option("--column", "-c", help="Column to keep (repeat; sets the order)."),
+    ] = None,
+    drop: Annotated[
+        list[str] | None, typer.Option("--drop", "-d", help="Column to remove (repeat).")
+    ] = None,
+    rename: Annotated[
+        list[str] | None, typer.Option("--rename", "-r", help="Rename a column: OLD=NEW.")
+    ] = None,
+    output: CsvOutput = None,
+    encoding: CsvEncoding = None,
+) -> None:
+    """Select, drop and/or rename columns (applied in that order)."""
+    if not (column or drop or rename):
+        raise _fail("give at least one of --column, --drop or --rename", 2)
+    doc = _open_csv(file)
+    try:
+        if column:
+            doc.select_columns(list(column))
+        if drop:
+            doc.drop_columns(list(drop))
+        if rename:
+            doc.rename_columns(_pairs(list(rename), "--rename"))
+        _emit_csv(doc, output, encoding)
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None
+
+
+@csv_app.command("join")
+def csv_join(
+    left: Annotated[Path, typer.Argument(help="Left table.")],
+    right: Annotated[Path, typer.Argument(help="Right table.")],
+    on: Annotated[list[str], typer.Option("--on", help="Key column (repeat for more).")],
+    right_on: Annotated[
+        list[str] | None,
+        typer.Option("--right-on", help="Key column in the right table, if named differently."),
+    ] = None,
+    how: Annotated[str, typer.Option("--how", help="inner, left, right or outer.")] = "inner",
+    suffix: Annotated[
+        str, typer.Option("--suffix", help="Suffix for clashing right column names.")
+    ] = "_right",
+    output: CsvOutput = None,
+    encoding: CsvEncoding = None,
+) -> None:
+    """Join two tables on key column(s)."""
+    left_doc, right_doc = _open_csv(left), _open_csv(right)
+    try:
+        result = left_doc.join(
+            right_doc,
+            list(on),
+            right_on=list(right_on) if right_on else None,
+            how=how,
+            suffix=suffix,
+        )
+        _emit_csv(result, output, encoding)
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None
+
+
+@csv_app.command("group")
+def csv_group(
+    file: FileArg,
+    agg: Annotated[
+        list[str],
+        typer.Option(
+            "--agg", "-a", help="Aggregate: count, sum:COL, mean:COL, NAME=max:COL, ... (repeat)."
+        ),
+    ],
+    by: Annotated[
+        list[str] | None, typer.Option("--by", "-b", help="Group column (repeat; omit for totals).")
+    ] = None,
+    no_sort: Annotated[
+        bool, typer.Option("--no-sort", help="Keep groups in first-seen order.")
+    ] = False,
+    output: CsvOutput = None,
+    encoding: CsvEncoding = None,
+) -> None:
+    """Group rows and compute statistics (count/sum/mean/min/max/median/first/last/nunique)."""
+    doc = _open_csv(file)
+    try:
+        result = doc.group_by(list(by or []), list(agg), sort=not no_sort)
+        _emit_csv(result, output, encoding)
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None
+
+
+@csv_app.command("stats")
+def csv_stats(
+    file: FileArg,
+    column: Annotated[
+        list[str] | None,
+        typer.Option("--column", "-c", help="Only these columns (default: all)."),
+    ] = None,
+) -> None:
+    """Show per-column statistics as JSON (type, count, empty, unique, min, max, sum, mean)."""
+    doc = _open_csv(file)
+    try:
+        _dump(doc.describe(column or None))
+    except _CSV_ERRORS as exc:
+        raise _fail(str(exc)) from None

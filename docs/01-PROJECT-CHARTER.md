@@ -112,7 +112,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 |------|------|------|------|
 | 編碼/分隔符號自動偵測（含 Big5、UTF-8 BOM） | P0 | ✅ | T010 |
 | 讀寫、型別推斷 | P0 | ✅ | T010 |
-| 篩選 / 排序 / 去重 / 合併 (join) / 統計 | P1 | ⬜ | T080 |
+| 篩選 / 排序 / 去重 / 合併 (join) / 統計 | P1 | ✅ | T080 |
 | 轉 XLSX / JSON / Parquet | P1 | 🟨 | T035（XLSX/JSON 完成；Parquet 未做） |
 
 ### 5.6 CAD — DXF / DWG（對照 AutoCAD）
