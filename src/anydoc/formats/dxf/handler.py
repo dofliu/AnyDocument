@@ -1,14 +1,14 @@
-"""DXF document (read, layer editing, rendering) and handler built on ezdxf."""
+"""DXF document (read, layer and entity editing, rendering) and handler built on ezdxf."""
 
 from __future__ import annotations
 
 import io
 import tempfile
 from collections import Counter
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeVar
 
 from ezdxf import filemanagement as ezdxf_files
 from ezdxf import units as dxf_units
@@ -16,11 +16,15 @@ from ezdxf import units as dxf_units
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.dxf import entities as entity_ops
 from anydoc.formats.dxf import layers as layer_ops
+from anydoc.formats.dxf.entities import EntityDetail, Point, decode_text
 from anydoc.formats.dxf.layers import LayerInfo
 from anydoc.formats.dxf.render import render_layout
 
 _DXF_MIME = "image/vnd.dxf"
+
+_T = TypeVar("_T")
 
 _RELEASES = {
     "AC1006": "R10",
@@ -68,9 +72,9 @@ class TextItem:
 def _entity_text(entity: Any) -> str | None:
     kind = entity.dxftype()
     if kind == "MTEXT":
-        return str(entity.plain_text())
+        return decode_text(str(entity.plain_text()))
     if kind in ("TEXT", "ATTRIB", "ATTDEF"):
-        return str(entity.dxf.text)
+        return decode_text(str(entity.dxf.text))
     return None
 
 
@@ -182,6 +186,102 @@ class DxfDocument:
         self.refresh()
         return removed
 
+    # -- entity editing ----------------------------------------------------
+
+    def entity(self, handle: str) -> EntityDetail:
+        """Return one entity (with geometry) by handle; ``KeyError`` when missing."""
+        return entity_ops.get_entity(self._doc, handle)
+
+    def entity_details(
+        self,
+        layout: str = "Model",
+        *,
+        layer: str | None = None,
+        types: Collection[str] | str | None = None,
+    ) -> list[EntityDetail]:
+        """Return the entities of a layout with geometry, filtered by layer/type(s)."""
+        return entity_ops.list_entities(self._doc, layout=layout, layer=layer, types=types)
+
+    def select(
+        self,
+        layout: str = "Model",
+        *,
+        layer: str | None = None,
+        types: Collection[str] | str | None = None,
+    ) -> list[str]:
+        """Return the handles of the entities in a layout matching the filters."""
+        return entity_ops.select(self._doc, layout=layout, layer=layer, types=types)
+
+    def add_line(self, start: Point, end: Point, **options: Any) -> str:
+        """Add a LINE and return its handle; see ``anydoc.formats.dxf.entities.add_line``."""
+        return self._edited(entity_ops.add_line(self._doc, start, end, **options))
+
+    def add_circle(self, center: Point, radius: float, **options: Any) -> str:
+        """Add a CIRCLE and return its handle."""
+        return self._edited(entity_ops.add_circle(self._doc, center, radius, **options))
+
+    def add_arc(
+        self, center: Point, radius: float, start_angle: float, end_angle: float, **options: Any
+    ) -> str:
+        """Add a counter-clockwise ARC (angles in degrees) and return its handle."""
+        return self._edited(
+            entity_ops.add_arc(self._doc, center, radius, start_angle, end_angle, **options)
+        )
+
+    def add_polyline(self, points: Iterable[Point], **options: Any) -> str:
+        """Add an LWPOLYLINE (``closed=True`` to close it) and return its handle."""
+        return self._edited(entity_ops.add_polyline(self._doc, points, **options))
+
+    def add_text(self, text: str, insert: Point, **options: Any) -> str:
+        """Add a single-line TEXT and return its handle."""
+        return self._edited(entity_ops.add_text(self._doc, text, insert, **options))
+
+    def add_mtext(self, text: str, insert: Point, **options: Any) -> str:
+        """Add a multi-line MTEXT and return its handle."""
+        return self._edited(entity_ops.add_mtext(self._doc, text, insert, **options))
+
+    def modify_entity(self, handle: str, **properties: Any) -> EntityDetail:
+        """Change entity properties; see ``anydoc.formats.dxf.entities.modify_entity``."""
+        return self._edited(entity_ops.modify_entity(self._doc, handle, **properties))
+
+    def delete_entities(self, handles: Iterable[str] | str) -> int:
+        """Delete entities by handle and return how many were removed."""
+        return self._edited(entity_ops.delete_entities(self._doc, handles))
+
+    def move_entities(
+        self, handles: Iterable[str] | str, dx: float, dy: float, dz: float = 0.0
+    ) -> list[str]:
+        """Translate entities by ``(dx, dy, dz)``."""
+        return entity_ops.move_entities(self._doc, handles, dx, dy, dz)
+
+    def rotate_entities(
+        self, handles: Iterable[str] | str, angle: float, base: Point = (0.0, 0.0)
+    ) -> list[str]:
+        """Rotate entities counter-clockwise by ``angle`` degrees around ``base``."""
+        return entity_ops.rotate_entities(self._doc, handles, angle, base)
+
+    def scale_entities(
+        self, handles: Iterable[str] | str, factor: float, base: Point = (0.0, 0.0)
+    ) -> list[str]:
+        """Scale entities uniformly by ``factor`` relative to ``base``."""
+        return entity_ops.scale_entities(self._doc, handles, factor, base)
+
+    def copy_entities(
+        self,
+        handles: Iterable[str] | str,
+        dx: float = 0.0,
+        dy: float = 0.0,
+        dz: float = 0.0,
+        *,
+        layer: str | None = None,
+    ) -> list[str]:
+        """Copy entities with an offset and return the handles of the copies."""
+        return self._edited(entity_ops.copy_entities(self._doc, handles, dx, dy, dz, layer=layer))
+
+    def _edited(self, result: _T) -> _T:
+        self.refresh()
+        return result
+
     def refresh(self) -> None:
         """Rebuild ``metadata`` after the drawing was edited."""
         self.metadata = self._build_metadata()
@@ -235,7 +335,9 @@ class DxfDocument:
                     items.append(TextItem(kind, text, e.dxf.layer, name))
                 elif kind == "INSERT":
                     for att in e.attribs:
-                        items.append(TextItem("ATTRIB", att.dxf.text, att.dxf.layer, name))
+                        items.append(
+                            TextItem("ATTRIB", decode_text(att.dxf.text), att.dxf.layer, name)
+                        )
         return [t for t in items if t.text]
 
     # -- rendering ---------------------------------------------------------

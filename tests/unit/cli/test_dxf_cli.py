@@ -164,3 +164,174 @@ def test_errors(drawing: Path, tmp_path: Path) -> None:
     broken.write_text("not a dxf", encoding="utf-8")
     corrupt = runner.invoke(app, ["dxf", "layers", str(broken)])
     assert corrupt.exit_code == 1
+
+
+# -- entity commands (T082) ----------------------------------------------------
+
+
+def _entities(path: Path, *args: str) -> list[dict[str, Any]]:
+    result = runner.invoke(app, ["dxf", "entities", str(path), *args])
+    assert result.exit_code == 0, result.output
+    rows: list[dict[str, Any]] = json.loads(result.stdout)
+    return rows
+
+
+def _run(*args: str) -> Any:
+    result = runner.invoke(app, ["dxf", *args])
+    assert result.exit_code == 0, result.output
+    return result
+
+
+def test_entities_lists_json(drawing: Path) -> None:
+    rows = _entities(drawing)
+    assert [row["type"] for row in rows] == ["LINE", "TEXT"]
+    assert rows[0]["layer"] == "牆" and rows[0]["end"] == [10.0, 0.0, 0.0]
+    assert rows[1]["text"] == "說明"
+    assert [row["type"] for row in _entities(drawing, "--type", "text")] == ["TEXT"]
+    assert _entities(drawing, "--layer", "空") == []
+    assert _entities(drawing, "--layout", "Layout1") == []
+
+
+def test_entity_add_each_type(drawing: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.dxf"
+    result = _run(
+        "entity-add", str(drawing), "line", "-o", str(out), "-p", "-5,3", "-p", "5,3", "-l", "空"
+    )
+    assert result.stdout.strip() == str(out) and "added " in result.stderr
+    _run("entity-add", str(out), "circle", "-o", str(out), "-p", "1,1", "-r", "2", "-c", "red")
+    _run(
+        "entity-add", str(out), "arc", "-o", str(out), "-p", "0,0", "-r", "3",
+        "--start-angle", "0", "--end-angle", "90", "--linetype", "DASHED",
+    )  # fmt: skip
+    _run(
+        "entity-add", str(out), "polyline", "-o", str(out),
+        "-p", "0,0", "-p", "4,0,1", "-p", "4,3", "--closed",
+    )  # fmt: skip
+    _run(
+        "entity-add", str(out), "text", "-o", str(out), "-p", "0,-5",
+        "--text", "標題", "--height", "4", "--rotation", "15",
+    )  # fmt: skip
+    _run(
+        "entity-add", str(out), "mtext", "-o", str(out), "-p", "0,-9",
+        "--text", "一\\n二", "--width", "30", "-c", "#336699",
+    )  # fmt: skip
+
+    rows = _entities(out)[2:]
+    assert [row["type"] for row in rows] == ["LINE", "CIRCLE", "ARC", "LWPOLYLINE", "TEXT", "MTEXT"]
+    assert rows[0]["layer"] == "空" and rows[0]["start"] == [-5.0, 3.0, 0.0]
+    assert rows[1]["color"] == 1 and rows[1]["radius"] == 2.0
+    assert rows[2]["linetype"] == "DASHED" and rows[2]["end_angle"] == 90.0
+    assert rows[3]["closed"] is True and rows[3]["points"][1] == [4.0, 0.0, 1.0]
+    assert (rows[4]["text"], rows[4]["height"], rows[4]["rotation"]) == ("標題", 4.0, 15.0)
+    assert rows[5]["text"] == "一\n二" and rows[5]["true_color"] == "#336699"
+    assert not ezdxf.readfile(out).audit().has_errors
+
+
+def test_entity_set(drawing: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.dxf"
+    line, text = (row["handle"] for row in _entities(drawing))
+    _run(
+        "entity-set", str(drawing), line, "-o", str(out),
+        "--start", "1,1", "--end", "-2,-2", "-c", "5", "-l", "空",
+    )  # fmt: skip
+    _run("entity-set", str(out), text, "-o", str(out), "--text", "新", "--insert", "3,4")
+    rows = _entities(out)
+    assert rows[0]["start"] == [1.0, 1.0, 0.0] and rows[0]["end"] == [-2.0, -2.0, 0.0]
+    assert rows[0]["color"] == 5 and rows[0]["layer"] == "空"
+    assert rows[1]["text"] == "新" and rows[1]["insert"] == [3.0, 4.0, 0.0]
+
+
+def test_entity_set_polyline_points(drawing: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.dxf"
+    _run("entity-add", str(drawing), "polyline", "-o", str(out), "-p", "0,0", "-p", "1,1")
+    handle = _entities(out, "-t", "LWPOLYLINE")[0]["handle"]
+    _run(
+        "entity-set", str(out), handle, "-o", str(out),
+        "-p", "0,0", "-p", "2,0", "-p", "2,2", "--closed",
+    )  # fmt: skip
+    row = _entities(out, "-t", "LWPOLYLINE")[0]
+    assert len(row["points"]) == 3 and row["closed"] is True
+
+
+def test_entity_delete_by_handle_and_selection(drawing: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.dxf"
+    line = _entities(drawing)[0]["handle"]
+    result = _run("entity-delete", str(drawing), line, "-o", str(out))
+    assert "deleted 1 entities" in result.stderr
+    assert [row["type"] for row in _entities(out)] == ["TEXT"]
+    result = _run("entity-delete", str(drawing), "--all", "-o", str(out))
+    assert "deleted 2 entities" in result.stderr and _entities(out) == []
+    _run("entity-delete", str(drawing), "--type", "TEXT", "-o", str(out))
+    assert [row["type"] for row in _entities(out)] == ["LINE"]
+
+
+def test_entity_move_copy_rotate_scale(drawing: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.dxf"
+    line = _entities(drawing)[0]["handle"]
+    assert (
+        "moved 1"
+        in _run("entity-move", str(drawing), line, "-o", str(out), "--dx", "5", "--dy", "-5").stderr
+    )
+    assert _entities(out)[0]["start"] == [5.0, -5.0, 0.0]
+
+    result = _run(
+        "entity-copy", str(out), "--layer", "牆", "-o", str(out), "--dy", "100", "--to-layer", "空"
+    )
+    assert "copied 2 entities" in result.stderr
+    rows = _entities(out)
+    assert len(rows) == 4 and rows[2]["layer"] == "空"
+    assert rows[2]["start"] == [5.0, 95.0, 0.0]
+
+    assert (
+        "rotated 1"
+        in _run(
+            "entity-rotate", str(out), line, "-o", str(out), "--angle", "90", "--base", "5,-5"
+        ).stderr
+    )
+    assert _entities(out)[0]["end"] == pytest.approx([5.0, 5.0, 0.0])
+
+    assert (
+        "scaled 4"
+        in _run("entity-scale", str(out), "--all", "-o", str(out), "--factor", "2").stderr
+    )
+    assert _entities(out)[0]["start"] == pytest.approx([10.0, -10.0, 0.0])
+    assert not ezdxf.readfile(out).audit().has_errors
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["entity-add", "hexagon", "-p", "0,0"], "Unknown entity type"),
+        (["entity-add", "line", "-p", "0,0"], "line needs 2 --point, got 1"),
+        (["entity-add", "polyline", "-p", "0,0"], "polyline needs 2 or more --point"),
+        (["entity-add", "circle", "-p", "0,0"], "circle needs --radius"),
+        (["entity-add", "arc", "-p", "0,0", "-r", "1"], "arc needs --start-angle"),
+        (["entity-add", "text", "-p", "0,0"], "text needs --text"),
+        (["entity-add", "line", "-p", "0;0", "-p", "1,1"], "Invalid point"),
+        (["entity-add", "line", "-p", "0,0", "-p", "1,1", "-l", "無"], "No such layer: 無"),
+        (["entity-add", "circle", "-p", "0,0", "-r", "-1"], "Radius must be greater than 0"),
+        (["entity-set", "FFFF", "-c", "1"], "No such entity: FFFF"),
+        (["entity-delete"], "No entities selected"),
+        (["entity-delete", "FFFF"], "No such entity: FFFF"),
+        (["entity-delete", "FFFF", "--all"], "not both"),
+        (["entity-move", "--layer", "空", "--dx", "1"], "No entities match"),
+        (["entity-rotate", "--all", "--angle", "90", "--base", "x"], "Invalid point"),
+        (["entity-scale", "--all", "--factor", "0"], "Scale factor must be greater than 0"),
+        (["entities", "--layout", "無"], "No such layout: 無"),
+    ],
+)
+def test_entity_errors(drawing: Path, tmp_path: Path, args: list[str], message: str) -> None:
+    out = tmp_path / "out.dxf"
+    extra = [] if args[0] == "entities" else ["-o", str(out)]
+    result = runner.invoke(app, ["dxf", args[0], str(drawing), *args[1:], *extra])
+    assert result.exit_code == 1, result.output
+    assert message in result.stderr
+    assert not out.exists()
+
+
+def test_entity_set_radius_on_line_fails(drawing: Path, tmp_path: Path) -> None:
+    line = _entities(drawing)[0]["handle"]
+    result = runner.invoke(
+        app, ["dxf", "entity-set", str(drawing), line, "-o", str(tmp_path / "o.dxf"), "-r", "2"]
+    )
+    assert result.exit_code == 1 and "'radius' does not apply to LINE" in result.stderr

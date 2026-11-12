@@ -1174,7 +1174,7 @@ def csv_stats(
         raise _fail(str(exc)) from None
 
 
-dxf_app = typer.Typer(help="DXF layer management.", no_args_is_help=True)
+dxf_app = typer.Typer(help="DXF layer management and entity editing.", no_args_is_help=True)
 app.add_typer(dxf_app, name="dxf")
 
 DxfOutput = Annotated[Path, typer.Option("--output", "-o", help="Output DXF path.")]
@@ -1330,6 +1330,352 @@ def dxf_layer_purge(file: FileArg, output: DxfOutput) -> None:
     try:
         removed = doc.purge_layers()
         typer.echo(f"removed {len(removed)} layers: {', '.join(removed)}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+# -- DXF entity editing ---------------------------------------------------------
+
+DxfLayout = Annotated[str, typer.Option("--layout", help="Layout name.")]
+DxfHandles = Annotated[
+    list[str] | None, typer.Argument(help="Entity handles (see `anydoc dxf entities`).")
+]
+DxfSelLayer = Annotated[
+    str | None, typer.Option("--layer", "-l", help="Select the entities on this layer.")
+]
+DxfSelType = Annotated[
+    list[str] | None, typer.Option("--type", "-t", help="Select this DXF type (repeatable).")
+]
+DxfSelAll = Annotated[bool, typer.Option("--all", help="Select every entity of the layout.")]
+DxfBase = Annotated[str, typer.Option("--base", "-b", help="Base point `x,y`.")]
+DxfPoints = Annotated[
+    list[str] | None,
+    typer.Option("--point", "-p", help="Point `x,y[,z]` (polyline: `x,y[,bulge]`); repeatable."),
+]
+
+
+def _dxf_point(text: str) -> tuple[float, ...]:
+    try:
+        values = tuple(float(part) for part in text.split(","))
+    except ValueError:
+        values = ()
+    if len(values) not in (2, 3):
+        raise ValueError(f"Invalid point (expected x,y or x,y,z): {text!r}")
+    return values
+
+
+def _dxf_selection(
+    doc: Any,
+    handles: list[str] | None,
+    layout: str,
+    layer: str | None,
+    types: list[str] | None,
+    select_all: bool,
+) -> list[str]:
+    """Resolve handles given explicitly or selected by --layer/--type/--all."""
+    if handles:
+        if layer is not None or types or select_all:
+            raise ValueError("Give either handles or --layer/--type/--all, not both")
+        return handles
+    if layer is None and not types and not select_all:
+        raise ValueError("No entities selected: give handles or --layer/--type/--all")
+    selected: list[str] = doc.select(layout, layer=layer, types=types or None)
+    if not selected:
+        raise ValueError("No entities match the selection")
+    return selected
+
+
+@dxf_app.command("entities")
+def dxf_entities(
+    file: FileArg,
+    layout: DxfLayout = "Model",
+    layer: Annotated[str | None, typer.Option("--layer", "-l", help="Only this layer.")] = None,
+    types: Annotated[
+        list[str] | None, typer.Option("--type", "-t", help="Only this DXF type (repeatable).")
+    ] = None,
+) -> None:
+    """List the entities of a layout as JSON (handle, type, layer, colour, geometry)."""
+    doc = _open_dxf(file)
+    try:
+        _dump([e.to_dict() for e in doc.entity_details(layout, layer=layer, types=types or None)])
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-add")
+def dxf_entity_add(
+    file: FileArg,
+    kind: Annotated[
+        str, typer.Argument(help="Entity type: line, circle, arc, polyline, text or mtext.")
+    ],
+    output: DxfOutput,
+    point: DxfPoints = None,
+    radius: Annotated[float | None, typer.Option("--radius", "-r", help="Radius.")] = None,
+    start_angle: Annotated[
+        float | None, typer.Option("--start-angle", help="Arc start angle in degrees.")
+    ] = None,
+    end_angle: Annotated[
+        float | None, typer.Option("--end-angle", help="Arc end angle in degrees.")
+    ] = None,
+    closed: Annotated[bool, typer.Option("--closed", help="Close the polyline.")] = False,
+    text: Annotated[str | None, typer.Option("--text", help="Text content.")] = None,
+    height: Annotated[float, typer.Option("--height", help="Text height.")] = 2.5,
+    rotation: Annotated[float, typer.Option("--rotation", help="Text rotation (degrees).")] = 0.0,
+    width: Annotated[
+        float | None, typer.Option("--width", help="MTEXT column width for wrapping.")
+    ] = None,
+    layer: Annotated[
+        str | None, typer.Option("--layer", "-l", help="Layer (default: current layer).")
+    ] = None,
+    color: Annotated[
+        str | None,
+        typer.Option("--color", "-c", help="ACI index, colour name, #RRGGBB, bylayer, byblock."),
+    ] = None,
+    linetype: Annotated[str | None, typer.Option("--linetype", help="Linetype name.")] = None,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Add a LINE, CIRCLE, ARC, LWPOLYLINE, TEXT or MTEXT; prints the new handle on stderr.
+
+    Points are given with repeated --point: line needs 2, circle/arc 1 (the centre),
+    polyline 2 or more, text/mtext 1 (the insertion point).
+    """
+    doc = _open_dxf(file)
+    common: dict[str, Any] = {
+        "layout": layout,
+        "layer": layer,
+        "color": color,
+        "linetype": linetype,
+    }
+    try:
+        points = [_dxf_point(p) for p in point or []]
+        name = kind.strip().lower()
+
+        def need(count: int, *, at_least: bool = False) -> None:
+            if len(points) < count or (not at_least and len(points) != count):
+                more = " or more" if at_least else ""
+                raise ValueError(f"{name} needs {count}{more} --point, got {len(points)}")
+
+        def required(value: Any, option: str) -> Any:
+            if value is None:
+                raise ValueError(f"{name} needs {option}")
+            return value
+
+        if name == "line":
+            need(2)
+            handle = doc.add_line(points[0], points[1], **common)
+        elif name == "circle":
+            need(1)
+            handle = doc.add_circle(points[0], required(radius, "--radius"), **common)
+        elif name == "arc":
+            need(1)
+            handle = doc.add_arc(
+                points[0],
+                required(radius, "--radius"),
+                required(start_angle, "--start-angle"),
+                required(end_angle, "--end-angle"),
+                **common,
+            )
+        elif name in ("polyline", "lwpolyline"):
+            need(2, at_least=True)
+            handle = doc.add_polyline(points, closed=closed, **common)
+        elif name == "text":
+            need(1)
+            handle = doc.add_text(
+                required(text, "--text"), points[0], height=height, rotation=rotation, **common
+            )
+        elif name == "mtext":
+            need(1)
+            handle = doc.add_mtext(
+                required(text, "--text").replace("\\n", "\n"),
+                points[0],
+                height=height,
+                rotation=rotation,
+                width=width,
+                **common,
+            )
+        else:
+            raise ValueError(f"Unknown entity type: {kind}")
+        typer.echo(f"added {handle}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-set")
+def dxf_entity_set(
+    file: FileArg,
+    handle: Annotated[str, typer.Argument(help="Entity handle.")],
+    output: DxfOutput,
+    layer: Annotated[str | None, typer.Option("--layer", "-l", help="Move to this layer.")] = None,
+    color: Annotated[
+        str | None,
+        typer.Option("--color", "-c", help="ACI index, colour name, #RRGGBB, bylayer, byblock."),
+    ] = None,
+    linetype: Annotated[str | None, typer.Option("--linetype", help="Linetype name.")] = None,
+    start: Annotated[str | None, typer.Option("--start", help="LINE start `x,y`.")] = None,
+    end: Annotated[str | None, typer.Option("--end", help="LINE end `x,y`.")] = None,
+    center: Annotated[str | None, typer.Option("--center", help="CIRCLE/ARC centre.")] = None,
+    radius: Annotated[float | None, typer.Option("--radius", "-r", help="Radius.")] = None,
+    start_angle: Annotated[
+        float | None, typer.Option("--start-angle", help="Arc start angle in degrees.")
+    ] = None,
+    end_angle: Annotated[
+        float | None, typer.Option("--end-angle", help="Arc end angle in degrees.")
+    ] = None,
+    point: DxfPoints = None,
+    closed: Annotated[
+        bool | None, typer.Option("--closed/--open", help="Close or open the polyline.")
+    ] = None,
+    text: Annotated[str | None, typer.Option("--text", help="Text content.")] = None,
+    insert: Annotated[str | None, typer.Option("--insert", help="Text insertion point.")] = None,
+    height: Annotated[float | None, typer.Option("--height", help="Text height.")] = None,
+    rotation: Annotated[
+        float | None, typer.Option("--rotation", help="Text rotation (degrees).")
+    ] = None,
+    width: Annotated[float | None, typer.Option("--width", help="MTEXT column width.")] = None,
+) -> None:
+    """Change the properties of one entity (--point replaces all polyline vertices)."""
+    doc = _open_dxf(file)
+
+    def pt(value: str | None) -> tuple[float, ...] | None:
+        return None if value is None else _dxf_point(value)
+
+    try:
+        is_mtext = doc.entity(handle).type == "MTEXT"
+        doc.modify_entity(
+            handle,
+            layer=layer,
+            color=color,
+            linetype=linetype,
+            start=pt(start),
+            end=pt(end),
+            center=pt(center),
+            radius=radius,
+            start_angle=start_angle,
+            end_angle=end_angle,
+            points=[_dxf_point(p) for p in point] if point else None,
+            closed=closed,
+            text=text.replace("\\n", "\n") if text is not None and is_mtext else text,
+            insert=pt(insert),
+            height=height,
+            rotation=rotation,
+            width=width,
+        )
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-delete")
+def dxf_entity_delete(
+    file: FileArg,
+    output: DxfOutput,
+    handles: DxfHandles = None,
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Delete entities given by handle or selected with --layer/--type/--all."""
+    doc = _open_dxf(file)
+    try:
+        selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        typer.echo(f"deleted {doc.delete_entities(selected)} entities", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-move")
+def dxf_entity_move(
+    file: FileArg,
+    output: DxfOutput,
+    handles: DxfHandles = None,
+    dx: Annotated[float, typer.Option("--dx", help="Offset along X.")] = 0.0,
+    dy: Annotated[float, typer.Option("--dy", help="Offset along Y.")] = 0.0,
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Move entities by (--dx, --dy)."""
+    doc = _open_dxf(file)
+    try:
+        selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        typer.echo(f"moved {len(doc.move_entities(selected, dx, dy))} entities", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-copy")
+def dxf_entity_copy(
+    file: FileArg,
+    output: DxfOutput,
+    handles: DxfHandles = None,
+    dx: Annotated[float, typer.Option("--dx", help="Offset of the copies along X.")] = 0.0,
+    dy: Annotated[float, typer.Option("--dy", help="Offset of the copies along Y.")] = 0.0,
+    to_layer: Annotated[
+        str | None, typer.Option("--to-layer", help="Put the copies on this layer.")
+    ] = None,
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Copy entities, offset by (--dx, --dy); prints the new handles on stderr."""
+    doc = _open_dxf(file)
+    try:
+        selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        copies = doc.copy_entities(selected, dx, dy, layer=to_layer)
+        typer.echo(f"copied {len(copies)} entities: {' '.join(copies)}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-rotate")
+def dxf_entity_rotate(
+    file: FileArg,
+    output: DxfOutput,
+    angle: Annotated[float, typer.Option("--angle", "-a", help="Angle in degrees (CCW).")],
+    handles: DxfHandles = None,
+    base: DxfBase = "0,0",
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Rotate entities counter-clockwise around --base."""
+    doc = _open_dxf(file)
+    try:
+        selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        count = len(doc.rotate_entities(selected, angle, _dxf_point(base)))
+        typer.echo(f"rotated {count} entities", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("entity-scale")
+def dxf_entity_scale(
+    file: FileArg,
+    output: DxfOutput,
+    factor: Annotated[float, typer.Option("--factor", "-f", help="Uniform scale factor (> 0).")],
+    handles: DxfHandles = None,
+    base: DxfBase = "0,0",
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Scale entities uniformly relative to --base."""
+    doc = _open_dxf(file)
+    try:
+        selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        count = len(doc.scale_entities(selected, factor, _dxf_point(base)))
+        typer.echo(f"scaled {count} entities", err=True)
         typer.echo(str(doc.save(output)))
     except _DXF_ERRORS as exc:
         raise _dxf_error(exc) from None
