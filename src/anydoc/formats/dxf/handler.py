@@ -18,8 +18,10 @@ from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.dxf import entities as entity_ops
 from anydoc.formats.dxf import layers as layer_ops
+from anydoc.formats.dxf import measure as measure_ops
 from anydoc.formats.dxf.entities import EntityDetail, Point, decode_text
 from anydoc.formats.dxf.layers import LayerInfo
+from anydoc.formats.dxf.measure import BoundingBox, Distance, Measurement, PickHit
 from anydoc.formats.dxf.render import render_layout
 
 _DXF_MIME = "image/vnd.dxf"
@@ -277,6 +279,58 @@ class DxfDocument:
     ) -> list[str]:
         """Copy entities with an offset and return the handles of the copies."""
         return self._edited(entity_ops.copy_entities(self._doc, handles, dx, dy, dz, layer=layer))
+
+    # -- measurement and spatial queries --------------------------------------
+
+    @staticmethod
+    def distance(p1: Point, p2: Point) -> Distance:
+        """Return the distance between two points with its components and angle."""
+        return measure_ops.distance(p1, p2)
+
+    def entity_length(self, handle: str) -> float:
+        """Return the length (perimeter when closed) of an entity in drawing units."""
+        return measure_ops.entity_length(self._doc, handle)
+
+    def entity_area(self, handle: str, *, assume_closed: bool = False) -> float:
+        """Return the area of a closed entity; see ``anydoc.formats.dxf.measure``."""
+        return measure_ops.entity_area(self._doc, handle, assume_closed=assume_closed)
+
+    def measure(self, handles: Iterable[str] | str) -> list[Measurement]:
+        """Return length, area and extents of the given entities."""
+        return measure_ops.measure_entities(self._doc, handles)
+
+    def bounding_box(
+        self,
+        handles: Iterable[str] | str | None = None,
+        *,
+        layout: str = "Model",
+        layer: str | None = None,
+        types: Collection[str] | str | None = None,
+        visible_only: bool = False,
+    ) -> BoundingBox | None:
+        """Return the extents of the given entities, or of a (filtered) layout."""
+        return measure_ops.bounding_box(
+            self._doc,
+            handles,
+            layout=layout,
+            layer=layer,
+            types=types,
+            visible_only=visible_only,
+        )
+
+    def entities_at(
+        self, point: Point, *, tolerance: float | None = None, **filters: Any
+    ) -> list[PickHit]:
+        """Return the entities near a picked point (XY), nearest first."""
+        return measure_ops.entities_at(self._doc, point, tolerance=tolerance, **filters)
+
+    def entities_in_window(
+        self, corner1: Point, corner2: Point, *, crossing: bool = False, **filters: Any
+    ) -> list[str]:
+        """Return the handles of the entities inside (or crossing) a window."""
+        return measure_ops.entities_in_window(
+            self._doc, corner1, corner2, crossing=crossing, **filters
+        )
 
     def _edited(self, result: _T) -> _T:
         self.refresh()

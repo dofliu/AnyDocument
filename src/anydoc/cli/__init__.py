@@ -1174,7 +1174,9 @@ def csv_stats(
         raise _fail(str(exc)) from None
 
 
-dxf_app = typer.Typer(help="DXF layer management and entity editing.", no_args_is_help=True)
+dxf_app = typer.Typer(
+    help="DXF layer management, entity editing and measurement.", no_args_is_help=True
+)
 app.add_typer(dxf_app, name="dxf")
 
 DxfOutput = Annotated[Path, typer.Option("--output", "-o", help="Output DXF path.")]
@@ -1677,5 +1679,154 @@ def dxf_entity_scale(
         count = len(doc.scale_entities(selected, factor, _dxf_point(base)))
         typer.echo(f"scaled {count} entities", err=True)
         typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+# -- DXF measurement --------------------------------------------------------------
+
+DxfVisible = Annotated[
+    bool, typer.Option("--visible-only", help="Skip layers that are off or frozen.")
+]
+
+
+@dxf_app.command("distance")
+def dxf_distance(
+    point: DxfPoints = None,
+    closed: Annotated[
+        bool, typer.Option("--closed", help="Close the path and report its area.")
+    ] = False,
+) -> None:
+    """Measure the distance between points given with -p `x,y[,z]` (two or more).
+
+    Prints JSON with the total length and each segment (distance, dx, dy, dz,
+    angle); with --closed the closing segment and the enclosed area are included.
+    """
+    from anydoc.formats.dxf import measure
+
+    try:
+        points = [_dxf_point(p) for p in point or []]
+        if len(points) < 2:
+            raise ValueError(f"distance needs 2 or more --point, got {len(points)}")
+        path = [*points, points[0]] if closed else points
+        segments = [measure.distance(a, b).to_dict() for a, b in zip(path, path[1:], strict=False)]
+        result: dict[str, Any] = {
+            "length": measure.path_length(points, closed=closed),
+            "segments": segments,
+        }
+        if closed:
+            result["area"] = measure.polygon_area(points)
+        _dump(result)
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("measure")
+def dxf_measure(
+    file: FileArg,
+    handles: DxfHandles = None,
+    layout: DxfLayout = "Model",
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+) -> None:
+    """Measure entities: length, area (closed shapes) and bounding box, as JSON.
+
+    Also prints the total length, total area and overall bounding box.
+    """
+    doc = _open_dxf(file)
+    try:
+        selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        rows = doc.measure(selected)
+        box = doc.bounding_box(selected)
+        _dump(
+            {
+                "units": doc.units,
+                "entities": [row.to_dict() for row in rows],
+                "total_length": sum(row.length or 0.0 for row in rows),
+                "total_area": sum(row.area or 0.0 for row in rows),
+                "bbox": None if box is None else box.to_dict(),
+            }
+        )
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("bbox")
+def dxf_bbox(
+    file: FileArg,
+    handles: DxfHandles = None,
+    layout: DxfLayout = "Model",
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    visible_only: DxfVisible = False,
+) -> None:
+    """Print the bounding box of a layout (or of the given/filtered entities) as JSON."""
+    doc = _open_dxf(file)
+    try:
+        if handles and (layer is not None or types or visible_only):
+            raise ValueError("Give either handles or --layer/--type/--visible-only, not both")
+        box = doc.bounding_box(
+            handles or None,
+            layout=layout,
+            layer=layer,
+            types=types or None,
+            visible_only=visible_only,
+        )
+        if box is None:
+            raise ValueError("No entities with extents")
+        _dump({"units": doc.units, **box.to_dict()})
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("query")
+def dxf_query(
+    file: FileArg,
+    at: Annotated[str | None, typer.Option("--at", help="Pick point `x,y`.")] = None,
+    tolerance: Annotated[
+        float | None,
+        typer.Option("--tolerance", help="Pick distance (default: 1% of the extents diagonal)."),
+    ] = None,
+    window: Annotated[
+        list[str] | None,
+        typer.Option("--window", "-w", help="Window corner `x,y`; give it twice."),
+    ] = None,
+    crossing: Annotated[
+        bool, typer.Option("--crossing", help="Also select entities crossing the window.")
+    ] = False,
+    layout: DxfLayout = "Model",
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    visible_only: DxfVisible = False,
+) -> None:
+    """Find entities at a point (--at) or in a rectangular window (-w twice), as JSON."""
+    doc = _open_dxf(file)
+    filters: dict[str, Any] = {
+        "layout": layout,
+        "layer": layer,
+        "types": types or None,
+        "visible_only": visible_only,
+    }
+    try:
+        if (at is None) == (not window):
+            raise ValueError("Give either --at or two --window corners")
+        if at is not None:
+            hits = doc.entities_at(_dxf_point(at), tolerance=tolerance, **filters)
+            distances = {hit.handle: hit.distance for hit in hits}
+            found = list(distances)
+        else:
+            corners = [_dxf_point(p) for p in window or []]
+            if len(corners) != 2:
+                raise ValueError(f"--window needs 2 corners, got {len(corners)}")
+            found = doc.entities_in_window(corners[0], corners[1], crossing=crossing, **filters)
+            distances = {}
+        rows = []
+        for handle in found:
+            row = doc.entity(handle).to_dict()
+            if handle in distances:
+                row["distance"] = distances[handle]
+            rows.append(row)
+        _dump(rows)
     except _DXF_ERRORS as exc:
         raise _dxf_error(exc) from None
