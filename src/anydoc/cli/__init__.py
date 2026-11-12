@@ -1172,3 +1172,164 @@ def csv_stats(
         _dump(doc.describe(column or None))
     except _CSV_ERRORS as exc:
         raise _fail(str(exc)) from None
+
+
+dxf_app = typer.Typer(help="DXF layer management.", no_args_is_help=True)
+app.add_typer(dxf_app, name="dxf")
+
+DxfOutput = Annotated[Path, typer.Option("--output", "-o", help="Output DXF path.")]
+LayerArg = Annotated[str, typer.Argument(help="Layer name (case-insensitive).")]
+_DXF_ERRORS = (AnyDocError, ValueError, LookupError, OSError)
+
+
+def _open_dxf(path: Path) -> Any:
+    from anydoc.formats.dxf import DxfHandler
+
+    if not path.is_file():
+        raise _fail(f"file not found: {path}", 2)
+    try:
+        return DxfHandler().open(path)
+    except AnyDocError as exc:
+        raise _fail(str(exc)) from None
+
+
+def _dxf_error(exc: BaseException) -> typer.Exit:
+    # KeyError quotes its message; show the plain text instead.
+    return _fail(str(exc.args[0]) if isinstance(exc, KeyError) and exc.args else str(exc))
+
+
+def _layer_dict(info: Any, usage: dict[str, int], current: str) -> dict[str, Any]:
+    return {
+        "name": info.name,
+        "color": info.color,
+        "true_color": info.true_color,
+        "linetype": info.linetype,
+        "on": info.on,
+        "frozen": info.frozen,
+        "locked": info.locked,
+        "current": info.name.lower() == current.lower(),
+        "entities": usage.get(info.name, 0),
+    }
+
+
+@dxf_app.command("layers")
+def dxf_layers(file: FileArg) -> None:
+    """List layers as JSON (colour, linetype, on/frozen/locked, current, entity count)."""
+    doc = _open_dxf(file)
+    usage = doc.layer_usage()
+    _dump([_layer_dict(info, usage, doc.current_layer) for info in doc.layers()])
+
+
+@dxf_app.command("layer-add")
+def dxf_layer_add(
+    file: FileArg,
+    name: LayerArg,
+    output: DxfOutput,
+    color: Annotated[
+        str, typer.Option("--color", "-c", help="ACI index 1-255, colour name or #RRGGBB.")
+    ] = "7",
+    linetype: Annotated[
+        str, typer.Option("--linetype", "-l", help="Linetype name, e.g. DASHED.")
+    ] = "Continuous",
+    off: Annotated[bool, typer.Option("--off", help="Create the layer switched off.")] = False,
+    frozen: Annotated[bool, typer.Option("--frozen", help="Create the layer frozen.")] = False,
+    locked: Annotated[bool, typer.Option("--locked", help="Create the layer locked.")] = False,
+) -> None:
+    """Add a layer."""
+    doc = _open_dxf(file)
+    try:
+        doc.add_layer(
+            name, color=color, linetype=linetype, on=not off, frozen=frozen, locked=locked
+        )
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("layer-set")
+def dxf_layer_set(
+    file: FileArg,
+    name: LayerArg,
+    output: DxfOutput,
+    color: Annotated[
+        str | None, typer.Option("--color", "-c", help="ACI index 1-255, colour name or #RRGGBB.")
+    ] = None,
+    linetype: Annotated[
+        str | None, typer.Option("--linetype", "-l", help="Linetype name, e.g. DASHED.")
+    ] = None,
+    on: Annotated[
+        bool | None, typer.Option("--on/--off", help="Switch the layer on or off.")
+    ] = None,
+    frozen: Annotated[
+        bool | None, typer.Option("--freeze/--thaw", help="Freeze or thaw the layer.")
+    ] = None,
+    locked: Annotated[
+        bool | None, typer.Option("--lock/--unlock", help="Lock or unlock the layer.")
+    ] = None,
+    current: Annotated[
+        bool, typer.Option("--current", help="Make this the current layer.")
+    ] = False,
+) -> None:
+    """Change layer colour, linetype and on/frozen/locked state."""
+    doc = _open_dxf(file)
+    try:
+        if current:
+            if frozen:
+                raise ValueError("Cannot freeze the current layer")
+            doc.set_layer(name, frozen=False if doc.layer(name).frozen else None)
+            doc.set_current_layer(name)
+        doc.set_layer(name, color=color, linetype=linetype, on=on, frozen=frozen, locked=locked)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("layer-rename")
+def dxf_layer_rename(
+    file: FileArg,
+    name: LayerArg,
+    new_name: Annotated[str, typer.Argument(help="New layer name.")],
+    output: DxfOutput,
+) -> None:
+    """Rename a layer and update the entities on it."""
+    doc = _open_dxf(file)
+    try:
+        doc.rename_layer(name, new_name)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("layer-delete")
+def dxf_layer_delete(
+    file: FileArg,
+    name: LayerArg,
+    output: DxfOutput,
+    move_to: Annotated[
+        str | None, typer.Option("--move-to", help="Move the layer's entities to this layer.")
+    ] = None,
+    delete_entities: Annotated[
+        bool, typer.Option("--delete-entities", help="Delete the layer's entities too.")
+    ] = False,
+) -> None:
+    """Delete a layer (in-use layers need --move-to or --delete-entities)."""
+    doc = _open_dxf(file)
+    try:
+        count = doc.delete_layer(name, move_to=move_to, delete_entities=delete_entities)
+        verb = "moved" if move_to is not None else "deleted"
+        typer.echo(f"{verb} {count} entities", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("layer-purge")
+def dxf_layer_purge(file: FileArg, output: DxfOutput) -> None:
+    """Delete every unused layer."""
+    doc = _open_dxf(file)
+    try:
+        removed = doc.purge_layers()
+        typer.echo(f"removed {len(removed)} layers: {', '.join(removed)}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None

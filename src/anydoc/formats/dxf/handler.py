@@ -1,7 +1,8 @@
-"""Read-oriented DXF document and handler built on ezdxf."""
+"""DXF document (read, layer editing, rendering) and handler built on ezdxf."""
 
 from __future__ import annotations
 
+import io
 import tempfile
 from collections import Counter
 from collections.abc import Collection
@@ -15,6 +16,8 @@ from ezdxf import units as dxf_units
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.dxf import layers as layer_ops
+from anydoc.formats.dxf.layers import LayerInfo
 from anydoc.formats.dxf.render import render_layout
 
 _DXF_MIME = "image/vnd.dxf"
@@ -31,18 +34,6 @@ _RELEASES = {
     "AC1027": "R2013",
     "AC1032": "R2018",
 }
-
-
-@dataclass(frozen=True)
-class LayerInfo:
-    """A drawing layer. ``color`` is the absolute ACI index (1-255); ``on`` is visibility."""
-
-    name: str
-    color: int
-    linetype: str
-    on: bool
-    frozen: bool
-    locked: bool
 
 
 @dataclass(frozen=True)
@@ -120,17 +111,80 @@ class DxfDocument:
 
     def layers(self) -> list[LayerInfo]:
         """Return every layer with colour, linetype and on/frozen/locked state."""
-        return [
-            LayerInfo(
-                name=layer.dxf.name,
-                color=layer.color,
-                linetype=layer.dxf.linetype,
-                on=layer.is_on(),
-                frozen=layer.is_frozen(),
-                locked=layer.is_locked(),
-            )
-            for layer in self._doc.layers
-        ]
+        return layer_ops.list_layers(self._doc)
+
+    def layer(self, name: str) -> LayerInfo:
+        """Return one layer by (case-insensitive) name; ``KeyError`` when missing."""
+        return layer_ops.get_layer(self._doc, name)
+
+    def layer_usage(self) -> dict[str, int]:
+        """Count the entities on each layer across all layouts and blocks."""
+        return layer_ops.layer_usage(self._doc)
+
+    @property
+    def current_layer(self) -> str:
+        """The current layer name (``$CLAYER``)."""
+        return layer_ops.current_layer(self._doc)
+
+    def set_current_layer(self, name: str) -> str:
+        """Make ``name`` the current layer and return its canonical name."""
+        return layer_ops.set_current_layer(self._doc, name)
+
+    def add_layer(
+        self,
+        name: str,
+        *,
+        color: int | str = 7,
+        linetype: str = "Continuous",
+        on: bool = True,
+        frozen: bool = False,
+        locked: bool = False,
+    ) -> LayerInfo:
+        """Create a layer; see ``anydoc.formats.dxf.layers.add_layer``."""
+        info = layer_ops.add_layer(
+            self._doc, name, color=color, linetype=linetype, on=on, frozen=frozen, locked=locked
+        )
+        self.refresh()
+        return info
+
+    def set_layer(
+        self,
+        name: str,
+        *,
+        color: int | str | None = None,
+        linetype: str | None = None,
+        on: bool | None = None,
+        frozen: bool | None = None,
+        locked: bool | None = None,
+    ) -> LayerInfo:
+        """Change layer properties; ``None`` leaves a property untouched."""
+        return layer_ops.set_layer(
+            self._doc, name, color=color, linetype=linetype, on=on, frozen=frozen, locked=locked
+        )
+
+    def rename_layer(self, old: str, new: str) -> LayerInfo:
+        """Rename a layer and update the entities that refer to it."""
+        return layer_ops.rename_layer(self._doc, old, new)
+
+    def delete_layer(
+        self, name: str, *, move_to: str | None = None, delete_entities: bool = False
+    ) -> int:
+        """Delete a layer; returns the number of entities moved or deleted."""
+        count = layer_ops.delete_layer(
+            self._doc, name, move_to=move_to, delete_entities=delete_entities
+        )
+        self.refresh()
+        return count
+
+    def purge_layers(self) -> list[str]:
+        """Delete every unused layer and return the removed names."""
+        removed = layer_ops.purge_layers(self._doc)
+        self.refresh()
+        return removed
+
+    def refresh(self) -> None:
+        """Rebuild ``metadata`` after the drawing was edited."""
+        self.metadata = self._build_metadata()
 
     def layout_names(self) -> list[str]:
         """Return layout names in tab order (``Model`` first)."""
@@ -242,6 +296,12 @@ class DxfDocument:
         self._doc.saveas(str(target))
         return target
 
+    def to_bytes(self) -> bytes:
+        """Serialise the drawing as ASCII DXF bytes in the drawing's own encoding."""
+        stream = io.StringIO()
+        self._doc.write(stream)
+        return stream.getvalue().encode(self._doc.output_encoding, errors="dxfreplace")
+
     def close(self) -> None:
         """Release resources (nothing to close for ezdxf)."""
 
@@ -253,7 +313,13 @@ class DxfHandler(FormatHandler):
     extensions: ClassVar[tuple[str, ...]] = ("dxf",)
     mime_types: ClassVar[tuple[str, ...]] = (_DXF_MIME, "application/dxf")
     capabilities: ClassVar[frozenset[Capability]] = frozenset(
-        {Capability.READ, Capability.EXTRACT_TEXT, Capability.RENDER}
+        {
+            Capability.READ,
+            Capability.WRITE,
+            Capability.EDIT,
+            Capability.EXTRACT_TEXT,
+            Capability.RENDER,
+        }
     )
 
     @classmethod
