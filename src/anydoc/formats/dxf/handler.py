@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, TypeVar
 
-from ezdxf import filemanagement as ezdxf_files
 from ezdxf import units as dxf_units
 
 from anydoc.core.errors import CorruptFileError
@@ -25,6 +24,7 @@ from anydoc.formats.dxf.blocks import BlockDetail, BlockRef, Scale
 from anydoc.formats.dxf.dimensions import DimensionInfo
 from anydoc.formats.dxf.entities import EntityDetail, Point, decode_text
 from anydoc.formats.dxf.layers import LayerInfo
+from anydoc.formats.dxf.loader import read_dxf
 from anydoc.formats.dxf.measure import BoundingBox, Distance, Measurement, PickHit
 from anydoc.formats.dxf.render import render_layout
 
@@ -654,10 +654,10 @@ class DxfHandler(FormatHandler):
         """Open a DXF from a path or bytes; invalid drawings raise ``CorruptFileError``."""
         try:
             if isinstance(source, Path):
-                return DxfDocument(ezdxf_files.readfile(str(source)), path=source)
+                return DxfDocument(read_dxf(source), path=source)
             with tempfile.TemporaryDirectory() as tmp:
                 tmp_path = Path(tmp) / "in.dxf"
                 tmp_path.write_bytes(source)
-                return DxfDocument(ezdxf_files.readfile(str(tmp_path)))
+                return DxfDocument(read_dxf(tmp_path))
         except Exception as exc:  # ezdxf raises DXFError, IOError, UnicodeError, ...
             raise CorruptFileError(f"Invalid DXF: {exc}") from exc
