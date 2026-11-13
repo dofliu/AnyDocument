@@ -144,6 +144,7 @@ Microsoft Office、Acrobat、AutoCAD 各自累積了數十年、數千項功能�
 | 統一文字擷取 | P0 | ✅ | T030 |
 | 轉換圖 / 任意轉換 | P0 | 🟨 | T031（引擎完成）、T032（Office/ODF→PDF）、T033（PDF↔影像）、T034（DOCX↔Markdown/HTML）、T035（XLSX/CSV/TSV/JSON） |
 | 縮圖 | P1 | ✅ | T036 |
+| REST API 服務 | P1 | 🟨 | T100（骨架：健康檢查/上傳/工作階段/下載/OpenAPI 完成）、T101–T104 |
 | 全文搜尋 | P2 | ⬜ | T090 |
 | 文件比較 (diff) | P2 | ⬜ | T091 |
 | 批次管線（YAML 定義） | P1 | ⬜ | T093 |

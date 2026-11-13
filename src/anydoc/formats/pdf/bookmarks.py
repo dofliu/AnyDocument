@@ -104,7 +104,7 @@ def _build(writer: PdfWriter, marks: Sequence[Bookmark], *, base_level: int = 0)
             raise ValueError(f"Bookmark {mark.title!r} has no page")
         (page,) = _check([mark.page], count)
         parent = parents[level - 1] if level > 0 else None
-        ref = writer.add_outline_item(mark.title, page, parent=parent)
+        ref = writer.add_outline_item(title=mark.title, page_number=page, parent=parent)
         del parents[level:]
         parents.append(ref)
         prev_level = level

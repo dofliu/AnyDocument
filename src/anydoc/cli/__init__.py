@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Annotated, Any
@@ -2343,3 +2344,42 @@ def dxf_query(
         _dump(rows)
     except _DXF_ERRORS as exc:
         raise _dxf_error(exc) from None
+
+
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option("--host", help="Interface to bind.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", "-p", min=0, max=65535, help="TCP port.")] = 8000,
+    storage_dir: Annotated[
+        Path | None,
+        typer.Option("--storage-dir", help="Directory for uploaded documents (default: temp)."),
+    ] = None,
+    max_upload_mb: Annotated[
+        float | None, typer.Option("--max-upload-mb", help="Upload size limit in MB.")
+    ] = None,
+    session_ttl: Annotated[
+        float | None, typer.Option("--session-ttl", help="Seconds a document lives when idle.")
+    ] = None,
+) -> None:
+    """Run the HTTP API server (needs the ``server`` extra: fastapi, uvicorn)."""
+    try:
+        import uvicorn
+
+        from anydoc.server import ServerSettings, create_app
+    except ImportError as exc:
+        raise _fail(
+            f'The API server needs extra packages ({exc.name}); install "anydoc[server]"'
+        ) from None
+    try:
+        settings = ServerSettings.from_env()
+        if storage_dir is not None:
+            settings = dataclasses.replace(settings, storage_dir=storage_dir)
+        if max_upload_mb is not None:
+            settings = dataclasses.replace(
+                settings, max_upload_bytes=int(max_upload_mb * 1024 * 1024)
+            )
+        if session_ttl is not None:
+            settings = dataclasses.replace(settings, session_ttl=session_ttl)
+    except ValueError as exc:
+        raise _fail(str(exc)) from None
+    uvicorn.run(create_app(settings), host=host, port=port)

@@ -137,3 +137,6 @@ Python 版本：**≥ 3.11**（容器內為 3.13）。
 - 預設上限：單檔 200 MB、ZIP 解壓比 100:1、解壓總量 1 GB。
 - Office 檔可剝除 `vbaProject.bin`；不執行任何巨集。
 - 伺服器上傳檔存放於隔離暫存目錄，逾時自動清除。
+- API 路由：文件集合為 `/docs`（`POST /docs` 上傳、`/docs/{id}`、`/docs/{id}/download`），因此互動式 API 文件改掛在
+  `/api/docs`（Swagger）與 `/api/redoc`，OpenAPI 於 `/openapi.json`；錯誤一律回傳 `{"error": {"code", "message"}}`。
+  伺服器相依套件（FastAPI、Uvicorn、python-multipart）為選用 extra `server`。

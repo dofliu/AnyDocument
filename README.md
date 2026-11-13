@@ -39,3 +39,15 @@ pip install -e ".[dev]"
 pytest
 anydoc info sample.docx
 ```
+
+### API 服務（T100 起）
+
+```bash
+pip install -e ".[server]"
+anydoc serve --port 8000            # 或 uvicorn --factory anydoc.server:create_app
+curl -F "file=@sample.docx" http://127.0.0.1:8000/docs     # 上傳，回傳工作階段 id
+curl -OJ http://127.0.0.1:8000/docs/<id>/download           # 下載
+```
+
+互動式 API 文件：`/api/docs`；設定：`ANYDOC_STORAGE_DIR`、`ANYDOC_MAX_UPLOAD_MB`（預設 200）、
+`ANYDOC_SESSION_TTL`（秒，預設 3600）、`ANYDOC_CLEANUP_INTERVAL`。
