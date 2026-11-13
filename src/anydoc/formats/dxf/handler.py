@@ -17,10 +17,12 @@ from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
 from anydoc.formats.dxf import blocks as block_ops
+from anydoc.formats.dxf import dimensions as dimension_ops
 from anydoc.formats.dxf import entities as entity_ops
 from anydoc.formats.dxf import layers as layer_ops
 from anydoc.formats.dxf import measure as measure_ops
 from anydoc.formats.dxf.blocks import BlockDetail, BlockRef, Scale
+from anydoc.formats.dxf.dimensions import DimensionInfo
 from anydoc.formats.dxf.entities import EntityDetail, Point, decode_text
 from anydoc.formats.dxf.layers import LayerInfo
 from anydoc.formats.dxf.measure import BoundingBox, Distance, Measurement, PickHit
@@ -379,6 +381,69 @@ class DxfDocument:
         return self._edited(
             block_ops.explode(self._doc, handles, attributes=attributes, recursive=recursive)
         )
+
+    # -- dimensions ------------------------------------------------------------
+
+    def dimensions(
+        self,
+        layout: str = "Model",
+        *,
+        block: str | None = None,
+        layer: str | None = None,
+        kinds: Collection[str] | str | None = None,
+    ) -> list[DimensionInfo]:
+        """Return the dimensions of a layout (or block) with measurement and text."""
+        return dimension_ops.list_dimensions(
+            self._doc, layout=layout, block=block, layer=layer, kinds=kinds
+        )
+
+    def dimension(self, handle: str) -> DimensionInfo:
+        """Return one dimension by handle; ``KeyError`` if it does not exist."""
+        return dimension_ops.get_dimension(self._doc, handle)
+
+    def dimension_styles(self) -> list[str]:
+        """Return the names of the dimension styles of the drawing."""
+        return dimension_ops.dimension_styles(self._doc)
+
+    def add_linear_dimension(self, p1: Point, p2: Point, **options: Any) -> str:
+        """Add a linear dimension; see ``dimensions.add_linear_dimension``."""
+        return self._edited(dimension_ops.add_linear_dimension(self._doc, p1, p2, **options))
+
+    def add_aligned_dimension(self, p1: Point, p2: Point, distance: float, **options: Any) -> str:
+        """Add an aligned dimension; see ``dimensions.add_aligned_dimension``."""
+        return self._edited(
+            dimension_ops.add_aligned_dimension(self._doc, p1, p2, distance, **options)
+        )
+
+    def add_radius_dimension(
+        self, center: Point | None = None, radius: float | None = None, **options: Any
+    ) -> str:
+        """Add a radius dimension; see ``dimensions.add_radius_dimension``."""
+        return self._edited(
+            dimension_ops.add_radius_dimension(self._doc, center, radius, **options)
+        )
+
+    def add_diameter_dimension(
+        self, center: Point | None = None, radius: float | None = None, **options: Any
+    ) -> str:
+        """Add a diameter dimension; see ``dimensions.add_diameter_dimension``."""
+        return self._edited(
+            dimension_ops.add_diameter_dimension(self._doc, center, radius, **options)
+        )
+
+    def set_dimension_text(self, handle: str, text: str | None) -> DimensionInfo:
+        """Override (or with ``None`` reset) the text of a dimension and redraw it."""
+        return self._edited(dimension_ops.set_dimension_text(self._doc, handle, text))
+
+    def update_dimensions(
+        self, handles: Iterable[str] | str | None = None, *, layout: str = "Model"
+    ) -> list[str]:
+        """Redraw dimensions (all of ``layout`` by default) from their definition points."""
+        return self._edited(dimension_ops.update_dimensions(self._doc, handles, layout=layout))
+
+    def delete_dimensions(self, handles: Iterable[str] | str) -> int:
+        """Delete dimensions together with their geometry blocks."""
+        return self._edited(dimension_ops.delete_dimensions(self._doc, handles))
 
     # -- measurement and spatial queries --------------------------------------
 

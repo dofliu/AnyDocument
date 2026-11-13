@@ -1175,7 +1175,8 @@ def csv_stats(
 
 
 dxf_app = typer.Typer(
-    help="DXF layer management, entity editing, blocks and measurement.", no_args_is_help=True
+    help="DXF layer management, entity editing, blocks, dimensions and measurement.",
+    no_args_is_help=True,
 )
 app.add_typer(dxf_app, name="dxf")
 
@@ -1979,6 +1980,217 @@ def dxf_explode(
             selected, attributes="drop" if drop_attributes else "text", recursive=recursive
         )
         typer.echo(f"exploded {len(selected)} references into {len(created)} entities", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+# -- DXF dimensions ---------------------------------------------------------------
+
+_DIM_KINDS = ("linear", "aligned", "radius", "diameter")
+
+
+@dxf_app.command("dims")
+def dxf_dims(
+    file: FileArg,
+    layout: DxfLayout = "Model",
+    layer: Annotated[str | None, typer.Option("--layer", "-l", help="Only this layer.")] = None,
+    kind: Annotated[
+        list[str] | None,
+        typer.Option("--kind", "-k", help="Only this kind, e.g. linear, radius (repeatable)."),
+    ] = None,
+    block: DxfInBlock = None,
+) -> None:
+    """List dimensions as JSON (handle, kind, measurement, displayed text, points)."""
+    doc = _open_dxf(file)
+    try:
+        dims = doc.dimensions(layout, block=block, layer=layer, kinds=kind or None)
+        _dump([d.to_dict() for d in dims])
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("dim-add")
+def dxf_dim_add(
+    file: FileArg,
+    kind: Annotated[str, typer.Argument(help="Kind: linear, aligned, radius or diameter.")],
+    output: DxfOutput,
+    point: DxfPoints = None,
+    base: Annotated[
+        str | None,
+        typer.Option("--base", "-b", help="Linear: point `x,y` on the dimension line."),
+    ] = None,
+    distance: Annotated[
+        float | None,
+        typer.Option("--distance", "-d", help="Offset of the dimension line from the points."),
+    ] = None,
+    angle: Annotated[
+        str | None,
+        typer.Option(
+            "--angle",
+            "-a",
+            help="Linear: `horizontal`, `vertical` or degrees. Radius/diameter: direction.",
+        ),
+    ] = None,
+    radius: Annotated[float | None, typer.Option("--radius", "-r", help="Circle radius.")] = None,
+    entity: Annotated[
+        str | None,
+        typer.Option("--entity", "-e", help="Radius/diameter: handle of a CIRCLE or ARC."),
+    ] = None,
+    text: Annotated[
+        str | None, typer.Option("--text", help="Text override; `<>` is the measurement.")
+    ] = None,
+    style: Annotated[
+        str | None, typer.Option("--style", help="Dimension style (default: current).")
+    ] = None,
+    text_height: Annotated[
+        float | None, typer.Option("--text-height", help="Text height override.")
+    ] = None,
+    arrow_size: Annotated[
+        float | None, typer.Option("--arrow-size", help="Arrow size override.")
+    ] = None,
+    decimals: Annotated[
+        int | None, typer.Option("--decimals", help="Decimal places override (0-8).")
+    ] = None,
+    separator: Annotated[
+        str | None, typer.Option("--separator", help="Decimal separator override: `.` or `,`.")
+    ] = None,
+    layer: Annotated[
+        str | None, typer.Option("--layer", "-l", help="Layer (default: current layer).")
+    ] = None,
+    color: Annotated[
+        str | None,
+        typer.Option("--color", "-c", help="ACI index, colour name, #RRGGBB, bylayer, byblock."),
+    ] = None,
+    layout: DxfLayout = "Model",
+    block: DxfInBlock = None,
+) -> None:
+    """Add a dimension; prints the new handle and its measurement on stderr.
+
+    linear and aligned need two --point (the measured points) and --distance
+    (linear may use --base instead); radius and diameter need --entity, or one
+    --point (the centre) and --radius.
+    """
+    doc = _open_dxf(file)
+    common: dict[str, Any] = {
+        "text": text,
+        "style": style,
+        "text_height": text_height,
+        "arrow_size": arrow_size,
+        "decimals": decimals,
+        "decimal_separator": separator,
+        "layout": layout,
+        "block": block,
+        "layer": layer,
+        "color": color,
+    }
+    try:
+        name = kind.strip().lower()
+        if name not in _DIM_KINDS:
+            raise ValueError(f"Unknown dimension kind: {kind} (use {', '.join(_DIM_KINDS)})")
+        points = [_dxf_point(p) for p in point or []]
+        if name in ("linear", "aligned"):
+            if len(points) != 2:
+                raise ValueError(f"{name} needs exactly 2 --point values")
+            if radius is not None or entity is not None:
+                raise ValueError(f"--radius and --entity do not apply to {name} dimensions")
+            if name == "linear":
+                handle = doc.add_linear_dimension(
+                    points[0],
+                    points[1],
+                    base=None if base is None else _dxf_point(base),
+                    distance=distance,
+                    angle=_dxf_dim_angle(angle, named=True),
+                    **common,
+                )
+            else:
+                if base is not None or angle is not None:
+                    raise ValueError("--base and --angle do not apply to aligned dimensions")
+                if distance is None:
+                    raise ValueError("aligned needs --distance")
+                handle = doc.add_aligned_dimension(points[0], points[1], distance, **common)
+        else:
+            if base is not None or distance is not None:
+                raise ValueError(f"--base and --distance do not apply to {name} dimensions")
+            if len(points) > 1:
+                raise ValueError(f"{name} takes at most 1 --point (the centre)")
+            add = doc.add_radius_dimension if name == "radius" else doc.add_diameter_dimension
+            handle = add(
+                points[0] if points else None,
+                radius,
+                entity=entity,
+                angle=_dxf_dim_angle(angle, named=False),
+                **common,
+            )
+        info = doc.dimension(handle)
+        typer.echo(f"added {handle} measurement {info.measurement:g} text {info.text}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+def _dxf_dim_angle(value: str | None, *, named: bool) -> float | str:
+    if value is None:
+        return 0.0
+    if named and value.strip().lower() in ("horizontal", "vertical"):
+        return value
+    try:
+        return float(value)
+    except ValueError:
+        raise ValueError(f"Invalid angle: {value!r}") from None
+
+
+@dxf_app.command("dim-set")
+def dxf_dim_set(
+    file: FileArg,
+    handle: Annotated[str, typer.Argument(help="Dimension handle (see `anydoc dxf dims`).")],
+    output: DxfOutput,
+    text: Annotated[
+        str | None, typer.Option("--text", help="Text override; `<>` is the measurement.")
+    ] = None,
+    reset: Annotated[
+        bool, typer.Option("--reset", help="Remove the override and show the measurement.")
+    ] = False,
+) -> None:
+    """Override or reset the text of a dimension and redraw it."""
+    doc = _open_dxf(file)
+    try:
+        if (text is None) == (not reset):
+            raise ValueError("Give exactly one of --text and --reset")
+        info = doc.set_dimension_text(handle, None if reset else text)
+        typer.echo(f"dimension {info.handle} text {info.text}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("dim-update")
+def dxf_dim_update(
+    file: FileArg,
+    output: DxfOutput,
+    handles: DxfHandles = None,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Redraw dimensions (default: all of the layout) after they were moved or scaled."""
+    doc = _open_dxf(file)
+    try:
+        updated = doc.update_dimensions(handles or None, layout=layout)
+        typer.echo(f"updated {len(updated)} dimensions", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("dim-delete")
+def dxf_dim_delete(
+    file: FileArg,
+    output: DxfOutput,
+    handles: Annotated[list[str], typer.Argument(help="Dimension handles.")],
+) -> None:
+    """Delete dimensions together with their geometry blocks."""
+    doc = _open_dxf(file)
+    try:
+        typer.echo(f"deleted {doc.delete_dimensions(handles)} dimensions", err=True)
         typer.echo(str(doc.save(output)))
     except _DXF_ERRORS as exc:
         raise _dxf_error(exc) from None
