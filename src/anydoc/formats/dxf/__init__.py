@@ -1,5 +1,6 @@
-"""DXF handler: version, units, layers and entities (read, edit, measure), blocks, layouts, text."""
+"""DXF handler: version, units, layers, entities and blocks (read, edit, measure), layouts, text."""
 
+from anydoc.formats.dxf.blocks import AttDef, BlockDetail, BlockRef
 from anydoc.formats.dxf.entities import EntityDetail
 from anydoc.formats.dxf.handler import (
     BlockInfo,
@@ -12,7 +13,10 @@ from anydoc.formats.dxf.layers import LayerInfo
 from anydoc.formats.dxf.measure import BoundingBox, Distance, Measurement, PickHit
 
 __all__ = [
+    "AttDef",
+    "BlockDetail",
     "BlockInfo",
+    "BlockRef",
     "BoundingBox",
     "Distance",
     "DxfDocument",

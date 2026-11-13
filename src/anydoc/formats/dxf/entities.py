@@ -2,7 +2,8 @@
 
 All functions operate on an ``ezdxf`` drawing and address entities by their handle
 (a hexadecimal string, matched case-insensitively). New entities are placed on the
-current layer (``$CLAYER``) unless ``layer`` is given. Points are ``(x, y)`` or
+current layer (``$CLAYER``) unless ``layer`` is given, in the layout ``layout`` or,
+when ``block`` is given, in that block definition. Points are ``(x, y)`` or
 ``(x, y, z)`` sequences; polyline vertices are ``(x, y)`` or ``(x, y, bulge)``.
 Angles are in degrees, counter-clockwise.
 
@@ -194,6 +195,16 @@ def _layout(doc: Any, name: str) -> Any:
     return doc.layouts.get(name)
 
 
+def _space(doc: Any, layout: str, block: str | None = None) -> Any:
+    """Return the layout ``layout``, or the block definition ``block`` when given."""
+    if block is None:
+        return _layout(doc, layout)
+    space = doc.blocks.get(block) if block else None
+    if space is None or space.is_any_layout or str(space.name).startswith("*"):
+        raise KeyError(f"No such block: {block}")
+    return space
+
+
 def _common_attribs(
     doc: Any, layer: str | None, color: int | str | None, linetype: str | None
 ) -> tuple[dict[str, Any], tuple[int, int, int] | None]:
@@ -323,24 +334,26 @@ def list_entities(
     doc: Any,
     *,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     types: Collection[str] | str | None = None,
 ) -> list[EntityDetail]:
-    """Return the entities of ``layout``, optionally filtered by layer and DXF type(s)."""
+    """Return the entities of ``layout`` (or of ``block``), filtered by layer and DXF type(s)."""
     wanted = _type_set(types)
-    return [_detail(e) for e in _layout(doc, layout) if _matches(e, layer, wanted)]
+    return [_detail(e) for e in _space(doc, layout, block) if _matches(e, layer, wanted)]
 
 
 def select(
     doc: Any,
     *,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     types: Collection[str] | str | None = None,
 ) -> list[str]:
-    """Return the handles of the entities in ``layout`` matching the filters."""
+    """Return the handles of the entities in ``layout`` (or ``block``) matching the filters."""
     wanted = _type_set(types)
-    return [str(e.dxf.handle) for e in _layout(doc, layout) if _matches(e, layer, wanted)]
+    return [str(e.dxf.handle) for e in _space(doc, layout, block) if _matches(e, layer, wanted)]
 
 
 # -- add ---------------------------------------------------------------------------
@@ -352,6 +365,7 @@ def add_line(
     end: Point,
     *,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     color: int | str | None = None,
     linetype: str | None = None,
@@ -359,7 +373,7 @@ def add_line(
     """Add a LINE from ``start`` to ``end`` and return its handle."""
     p1, p2 = _point(start, "Start point"), _point(end, "End point")
     attribs, rgb = _common_attribs(doc, layer, color, linetype)
-    return _finish(_layout(doc, layout).add_line(p1, p2, dxfattribs=attribs), rgb)
+    return _finish(_space(doc, layout, block).add_line(p1, p2, dxfattribs=attribs), rgb)
 
 
 def add_circle(
@@ -368,6 +382,7 @@ def add_circle(
     radius: float,
     *,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     color: int | str | None = None,
     linetype: str | None = None,
@@ -375,7 +390,7 @@ def add_circle(
     """Add a CIRCLE and return its handle; ``radius`` must be positive."""
     c, r = _point(center, "Center"), _positive(radius, "Radius")
     attribs, rgb = _common_attribs(doc, layer, color, linetype)
-    return _finish(_layout(doc, layout).add_circle(c, r, dxfattribs=attribs), rgb)
+    return _finish(_space(doc, layout, block).add_circle(c, r, dxfattribs=attribs), rgb)
 
 
 def add_arc(
@@ -386,6 +401,7 @@ def add_arc(
     end_angle: float,
     *,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     color: int | str | None = None,
     linetype: str | None = None,
@@ -394,7 +410,7 @@ def add_arc(
     c, r = _point(center, "Center"), _positive(radius, "Radius")
     a1, a2 = _number(start_angle, "Start angle"), _number(end_angle, "End angle")
     attribs, rgb = _common_attribs(doc, layer, color, linetype)
-    return _finish(_layout(doc, layout).add_arc(c, r, a1, a2, dxfattribs=attribs), rgb)
+    return _finish(_space(doc, layout, block).add_arc(c, r, a1, a2, dxfattribs=attribs), rgb)
 
 
 def add_polyline(
@@ -403,6 +419,7 @@ def add_polyline(
     *,
     closed: bool = False,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     color: int | str | None = None,
     linetype: str | None = None,
@@ -414,7 +431,7 @@ def add_polyline(
     vertices = _vertices(points)
     _requires_r2000(doc, "LWPOLYLINE")
     attribs, rgb = _common_attribs(doc, layer, color, linetype)
-    entity = _layout(doc, layout).add_lwpolyline(
+    entity = _space(doc, layout, block).add_lwpolyline(
         vertices, format="xyb", close=bool(closed), dxfattribs=attribs
     )
     return _finish(entity, rgb)
@@ -428,6 +445,7 @@ def add_text(
     height: float = 2.5,
     rotation: float = 0.0,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     color: int | str | None = None,
     linetype: str | None = None,
@@ -439,7 +457,7 @@ def add_text(
         raise ValueError("TEXT is single-line; use add_mtext for multi-line text")
     attribs, rgb = _common_attribs(doc, layer, color, linetype)
     attribs["insert"] = p
-    entity = _layout(doc, layout).add_text(text, height=h, rotation=angle, dxfattribs=attribs)
+    entity = _space(doc, layout, block).add_text(text, height=h, rotation=angle, dxfattribs=attribs)
     return _finish(entity, rgb)
 
 
@@ -452,6 +470,7 @@ def add_mtext(
     width: float | None = None,
     rotation: float = 0.0,
     layout: str = "Model",
+    block: str | None = None,
     layer: str | None = None,
     color: int | str | None = None,
     linetype: str | None = None,
@@ -469,7 +488,7 @@ def add_mtext(
     attribs.update({"insert": p, "char_height": h, "attachment_point": 1})
     if w is not None:
         attribs["width"] = w
-    entity = _layout(doc, layout).add_mtext(_mtext_content(text), dxfattribs=attribs)
+    entity = _space(doc, layout, block).add_mtext(_mtext_content(text), dxfattribs=attribs)
     if angle:
         entity.set_rotation(angle)
     return _finish(entity, rgb)

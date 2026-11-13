@@ -1,11 +1,11 @@
-"""DXF document (read, layer and entity editing, rendering) and handler built on ezdxf."""
+"""DXF document (read, layer, entity and block editing, rendering) and handler built on ezdxf."""
 
 from __future__ import annotations
 
 import io
 import tempfile
 from collections import Counter
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, TypeVar
@@ -16,9 +16,11 @@ from ezdxf import units as dxf_units
 from anydoc.core.errors import CorruptFileError
 from anydoc.core.model import Capability, Metadata, Part
 from anydoc.core.registry import FormatHandler
+from anydoc.formats.dxf import blocks as block_ops
 from anydoc.formats.dxf import entities as entity_ops
 from anydoc.formats.dxf import layers as layer_ops
 from anydoc.formats.dxf import measure as measure_ops
+from anydoc.formats.dxf.blocks import BlockDetail, BlockRef, Scale
 from anydoc.formats.dxf.entities import EntityDetail, Point, decode_text
 from anydoc.formats.dxf.layers import LayerInfo
 from anydoc.formats.dxf.measure import BoundingBox, Distance, Measurement, PickHit
@@ -200,9 +202,12 @@ class DxfDocument:
         *,
         layer: str | None = None,
         types: Collection[str] | str | None = None,
+        block: str | None = None,
     ) -> list[EntityDetail]:
-        """Return the entities of a layout with geometry, filtered by layer/type(s)."""
-        return entity_ops.list_entities(self._doc, layout=layout, layer=layer, types=types)
+        """Return the entities of a layout (or block) with geometry, filtered by layer/type(s)."""
+        return entity_ops.list_entities(
+            self._doc, layout=layout, block=block, layer=layer, types=types
+        )
 
     def select(
         self,
@@ -210,9 +215,10 @@ class DxfDocument:
         *,
         layer: str | None = None,
         types: Collection[str] | str | None = None,
+        block: str | None = None,
     ) -> list[str]:
-        """Return the handles of the entities in a layout matching the filters."""
-        return entity_ops.select(self._doc, layout=layout, layer=layer, types=types)
+        """Return the handles of the entities in a layout (or block) matching the filters."""
+        return entity_ops.select(self._doc, layout=layout, block=block, layer=layer, types=types)
 
     def add_line(self, start: Point, end: Point, **options: Any) -> str:
         """Add a LINE and return its handle; see ``anydoc.formats.dxf.entities.add_line``."""
@@ -279,6 +285,100 @@ class DxfDocument:
     ) -> list[str]:
         """Copy entities with an offset and return the handles of the copies."""
         return self._edited(entity_ops.copy_entities(self._doc, handles, dx, dy, dz, layer=layer))
+
+    # -- blocks --------------------------------------------------------------
+
+    def block(self, name: str) -> BlockDetail:
+        """Return one block definition (attributes, reference count); ``KeyError`` if missing."""
+        return block_ops.get_block(self._doc, name)
+
+    def block_details(self) -> list[BlockDetail]:
+        """Return every user block definition with attribute definitions and reference counts."""
+        return block_ops.list_blocks(self._doc)
+
+    def define_block(
+        self,
+        name: str,
+        *,
+        base_point: Point = (0.0, 0.0),
+        handles: Iterable[str] | str | None = None,
+        keep: bool = False,
+        replace: bool = False,
+        description: str = "",
+    ) -> BlockDetail:
+        """Create a block, optionally from entities; see ``anydoc.formats.dxf.blocks``."""
+        return self._edited(
+            block_ops.define_block(
+                self._doc,
+                name,
+                base_point=base_point,
+                handles=handles,
+                keep=keep,
+                replace=replace,
+                description=description,
+            )
+        )
+
+    def add_attdef(self, block: str, tag: str, insert: Point, **options: Any) -> str:
+        """Add an attribute definition to a block and return its handle."""
+        return block_ops.add_attdef(self._doc, block, tag, insert, **options)
+
+    def rename_block(self, old: str, new: str) -> BlockDetail:
+        """Rename a block and update the references to it."""
+        return block_ops.rename_block(self._doc, old, new)
+
+    def delete_block(self, name: str, *, delete_references: bool = False) -> int:
+        """Delete a block; returns the number of references deleted with it."""
+        return self._edited(
+            block_ops.delete_block(self._doc, name, delete_references=delete_references)
+        )
+
+    def purge_blocks(self) -> list[str]:
+        """Delete every unreferenced block and return the removed names."""
+        return self._edited(block_ops.purge_blocks(self._doc))
+
+    def insert_block(self, name: str, insert: Point, **options: Any) -> str:
+        """Insert a block reference and return its handle; see ``blocks.insert_block``."""
+        return self._edited(block_ops.insert_block(self._doc, name, insert, **options))
+
+    def inserts(
+        self, layout: str = "Model", *, block: str | None = None, name: str | None = None
+    ) -> list[BlockRef]:
+        """Return the block references of a layout (or block), optionally of one block."""
+        return block_ops.list_inserts(self._doc, layout=layout, block=block, name=name)
+
+    def insert(self, handle: str) -> BlockRef:
+        """Return one block reference by handle."""
+        return block_ops.get_insert(self._doc, handle)
+
+    def attributes(self, handle: str) -> dict[str, str]:
+        """Return the attribute values of a block reference as ``{tag: text}``."""
+        return block_ops.get_attributes(self._doc, handle)
+
+    def set_attributes(self, handle: str, values: Mapping[str, str]) -> dict[str, str]:
+        """Set attribute values of a block reference and return all its attributes."""
+        return block_ops.set_attributes(self._doc, handle, values)
+
+    def modify_insert(
+        self,
+        handle: str,
+        *,
+        insert: Point | None = None,
+        scale: Scale | None = None,
+        rotation: float | None = None,
+    ) -> BlockRef:
+        """Change position, scale or rotation of a block reference."""
+        return block_ops.modify_insert(
+            self._doc, handle, insert=insert, scale=scale, rotation=rotation
+        )
+
+    def explode(
+        self, handles: Iterable[str] | str, *, attributes: str = "text", recursive: bool = False
+    ) -> list[str]:
+        """Explode block references into their entities and return the new handles."""
+        return self._edited(
+            block_ops.explode(self._doc, handles, attributes=attributes, recursive=recursive)
+        )
 
     # -- measurement and spatial queries --------------------------------------
 

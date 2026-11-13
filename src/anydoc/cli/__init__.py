@@ -1175,7 +1175,7 @@ def csv_stats(
 
 
 dxf_app = typer.Typer(
-    help="DXF layer management, entity editing and measurement.", no_args_is_help=True
+    help="DXF layer management, entity editing, blocks and measurement.", no_args_is_help=True
 )
 app.add_typer(dxf_app, name="dxf")
 
@@ -1351,6 +1351,9 @@ DxfSelType = Annotated[
 ]
 DxfSelAll = Annotated[bool, typer.Option("--all", help="Select every entity of the layout.")]
 DxfBase = Annotated[str, typer.Option("--base", "-b", help="Base point `x,y`.")]
+DxfInBlock = Annotated[
+    str | None, typer.Option("--block", help="Work in this block definition, not a layout.")
+]
 DxfPoints = Annotated[
     list[str] | None,
     typer.Option("--point", "-p", help="Point `x,y[,z]` (polyline: `x,y[,bulge]`); repeatable."),
@@ -1396,11 +1399,13 @@ def dxf_entities(
     types: Annotated[
         list[str] | None, typer.Option("--type", "-t", help="Only this DXF type (repeatable).")
     ] = None,
+    block: DxfInBlock = None,
 ) -> None:
-    """List the entities of a layout as JSON (handle, type, layer, colour, geometry)."""
+    """List the entities of a layout (or block) as JSON (handle, type, layer, geometry)."""
     doc = _open_dxf(file)
     try:
-        _dump([e.to_dict() for e in doc.entity_details(layout, layer=layer, types=types or None)])
+        details = doc.entity_details(layout, layer=layer, types=types or None, block=block)
+        _dump([e.to_dict() for e in details])
     except _DXF_ERRORS as exc:
         raise _dxf_error(exc) from None
 
@@ -1436,15 +1441,18 @@ def dxf_entity_add(
     ] = None,
     linetype: Annotated[str | None, typer.Option("--linetype", help="Linetype name.")] = None,
     layout: DxfLayout = "Model",
+    block: DxfInBlock = None,
 ) -> None:
     """Add a LINE, CIRCLE, ARC, LWPOLYLINE, TEXT or MTEXT; prints the new handle on stderr.
 
     Points are given with repeated --point: line needs 2, circle/arc 1 (the centre),
-    polyline 2 or more, text/mtext 1 (the insertion point).
+    polyline 2 or more, text/mtext 1 (the insertion point). --block adds the entity
+    to a block definition instead of a layout.
     """
     doc = _open_dxf(file)
     common: dict[str, Any] = {
         "layout": layout,
+        "block": block,
         "layer": layer,
         "color": color,
         "linetype": linetype,
@@ -1678,6 +1686,299 @@ def dxf_entity_scale(
         selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
         count = len(doc.scale_entities(selected, factor, _dxf_point(base)))
         typer.echo(f"scaled {count} entities", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+# -- DXF blocks -------------------------------------------------------------------
+
+BlockArg = Annotated[str, typer.Argument(help="Block name (case-insensitive).")]
+DxfAttrs = Annotated[
+    list[str] | None,
+    typer.Option("--attr", "-a", help="Attribute value as `TAG=VALUE`; repeatable."),
+]
+
+
+def _dxf_attrs(items: list[str] | None) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for item in items or []:
+        tag, sep, value = item.partition("=")
+        if not sep or not tag.strip():
+            raise ValueError(f"Invalid attribute (expected TAG=VALUE): {item!r}")
+        values[tag.strip()] = value
+    return values
+
+
+def _dxf_scale(text: str) -> float | tuple[float, ...]:
+    try:
+        values = tuple(float(part) for part in text.split(","))
+    except ValueError:
+        values = ()
+    if len(values) not in (1, 2, 3):
+        raise ValueError(f"Invalid scale (expected s or sx,sy[,sz]): {text!r}")
+    return values[0] if len(values) == 1 else values
+
+
+@dxf_app.command("blocks")
+def dxf_blocks(file: FileArg) -> None:
+    """List the block definitions as JSON (base point, entities, attributes, references)."""
+    _dump([block.to_dict() for block in _open_dxf(file).block_details()])
+
+
+@dxf_app.command("block-define")
+def dxf_block_define(
+    file: FileArg,
+    name: Annotated[str, typer.Argument(help="Name of the new block.")],
+    output: DxfOutput,
+    handles: DxfHandles = None,
+    base: DxfBase = "0,0",
+    keep: Annotated[
+        bool, typer.Option("--keep", help="Copy the entities instead of moving them.")
+    ] = False,
+    replace: Annotated[
+        bool, typer.Option("--replace", help="Insert a block reference in their place.")
+    ] = False,
+    description: Annotated[str, typer.Option("--description", help="Block description.")] = "",
+    layer: DxfSelLayer = None,
+    types: DxfSelType = None,
+    select_all: DxfSelAll = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Create a block, empty or from entities (handles or --layer/--type/--all)."""
+    doc = _open_dxf(file)
+    try:
+        selected: list[str] | None = None
+        if handles or layer is not None or types or select_all:
+            selected = _dxf_selection(doc, handles, layout, layer, types, select_all)
+        block = doc.define_block(
+            name,
+            base_point=_dxf_point(base),
+            handles=selected,
+            keep=keep,
+            replace=replace,
+            description=description,
+        )
+        typer.echo(f"defined {block.name} ({block.entity_count} entities)", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("block-attdef")
+def dxf_block_attdef(
+    file: FileArg,
+    name: BlockArg,
+    tag: Annotated[str, typer.Argument(help="Attribute tag (no whitespace).")],
+    output: DxfOutput,
+    at: Annotated[str, typer.Option("--at", help="Position `x,y` in the block.")] = "0,0",
+    default: Annotated[str, typer.Option("--default", help="Default value.")] = "",
+    prompt: Annotated[str, typer.Option("--prompt", help="Prompt text.")] = "",
+    height: Annotated[float, typer.Option("--height", help="Text height.")] = 2.5,
+    rotation: Annotated[float, typer.Option("--rotation", help="Text rotation (degrees).")] = 0.0,
+    invisible: Annotated[
+        bool, typer.Option("--invisible", help="Do not display the attribute.")
+    ] = False,
+    constant: Annotated[
+        bool, typer.Option("--constant", help="Fixed value (not editable per reference).")
+    ] = False,
+) -> None:
+    """Add an attribute definition to a block; prints the new handle on stderr."""
+    doc = _open_dxf(file)
+    try:
+        handle = doc.add_attdef(
+            name,
+            tag,
+            _dxf_point(at),
+            default=default,
+            prompt=prompt,
+            height=height,
+            rotation=rotation,
+            invisible=invisible,
+            constant=constant,
+        )
+        typer.echo(f"added {handle}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("block-rename")
+def dxf_block_rename(
+    file: FileArg,
+    name: BlockArg,
+    new_name: Annotated[str, typer.Argument(help="New block name.")],
+    output: DxfOutput,
+) -> None:
+    """Rename a block and update the references to it."""
+    doc = _open_dxf(file)
+    try:
+        doc.rename_block(name, new_name)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("block-delete")
+def dxf_block_delete(
+    file: FileArg,
+    name: BlockArg,
+    output: DxfOutput,
+    references: Annotated[
+        bool, typer.Option("--references", help="Also delete the references to the block.")
+    ] = False,
+) -> None:
+    """Delete a block definition (a referenced block needs --references)."""
+    doc = _open_dxf(file)
+    try:
+        count = doc.delete_block(name, delete_references=references)
+        typer.echo(f"deleted {count} references", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("block-purge")
+def dxf_block_purge(file: FileArg, output: DxfOutput) -> None:
+    """Delete every unreferenced block; the removed names are printed on stderr."""
+    doc = _open_dxf(file)
+    try:
+        for name in doc.purge_blocks():
+            typer.echo(f"removed {name}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("block-insert")
+def dxf_block_insert(
+    file: FileArg,
+    name: BlockArg,
+    output: DxfOutput,
+    at: Annotated[str, typer.Option("--at", help="Insertion point `x,y[,z]`.")] = "0,0",
+    scale: Annotated[
+        str, typer.Option("--scale", "-s", help="Scale factor `s` or `sx,sy[,sz]`.")
+    ] = "1",
+    rotation: Annotated[float, typer.Option("--rotation", help="Rotation in degrees.")] = 0.0,
+    attr: DxfAttrs = None,
+    layer: Annotated[
+        str | None, typer.Option("--layer", "-l", help="Layer (default: current layer).")
+    ] = None,
+    color: Annotated[
+        str | None,
+        typer.Option("--color", "-c", help="ACI index, colour name, #RRGGBB, bylayer, byblock."),
+    ] = None,
+    layout: DxfLayout = "Model",
+    block: DxfInBlock = None,
+) -> None:
+    """Insert a block reference; prints the new handle on stderr."""
+    doc = _open_dxf(file)
+    try:
+        handle = doc.insert_block(
+            name,
+            _dxf_point(at),
+            scale=_dxf_scale(scale),
+            rotation=rotation,
+            attributes=_dxf_attrs(attr),
+            layout=layout,
+            block=block,
+            layer=layer,
+            color=color,
+        )
+        typer.echo(f"added {handle}", err=True)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("inserts")
+def dxf_inserts(
+    file: FileArg,
+    name: Annotated[
+        str | None, typer.Option("--name", "-n", help="Only references to this block.")
+    ] = None,
+    layout: DxfLayout = "Model",
+    block: DxfInBlock = None,
+) -> None:
+    """List block references as JSON (handle, block, placement, attribute values)."""
+    doc = _open_dxf(file)
+    try:
+        _dump([ref.to_dict() for ref in doc.inserts(layout, block=block, name=name)])
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("insert-set")
+def dxf_insert_set(
+    file: FileArg,
+    handle: Annotated[str, typer.Argument(help="Handle of the block reference.")],
+    output: DxfOutput,
+    attr: DxfAttrs = None,
+    at: Annotated[str | None, typer.Option("--at", help="New insertion point `x,y`.")] = None,
+    scale: Annotated[
+        str | None, typer.Option("--scale", "-s", help="New scale `s` or `sx,sy[,sz]`.")
+    ] = None,
+    rotation: Annotated[
+        float | None, typer.Option("--rotation", help="New rotation in degrees.")
+    ] = None,
+) -> None:
+    """Set attribute values (--attr TAG=VALUE) and/or the placement of a block reference."""
+    doc = _open_dxf(file)
+    try:
+        values = _dxf_attrs(attr)
+        if not values and at is None and scale is None and rotation is None:
+            raise ValueError("Nothing to change: give --attr, --at, --scale or --rotation")
+        doc.insert(handle)  # validate the handle before changing anything
+        if at is not None or scale is not None or rotation is not None:
+            doc.modify_insert(
+                handle,
+                insert=None if at is None else _dxf_point(at),
+                scale=None if scale is None else _dxf_scale(scale),
+                rotation=rotation,
+            )
+        if values:
+            doc.set_attributes(handle, values)
+        typer.echo(str(doc.save(output)))
+    except _DXF_ERRORS as exc:
+        raise _dxf_error(exc) from None
+
+
+@dxf_app.command("explode")
+def dxf_explode(
+    file: FileArg,
+    output: DxfOutput,
+    handles: DxfHandles = None,
+    name: Annotated[
+        str | None, typer.Option("--name", "-n", help="Explode every reference to this block.")
+    ] = None,
+    select_all: Annotated[
+        bool, typer.Option("--all", help="Explode every block reference of the layout.")
+    ] = False,
+    drop_attributes: Annotated[
+        bool, typer.Option("--drop-attributes", help="Discard attributes (default: to TEXT).")
+    ] = False,
+    recursive: Annotated[
+        bool, typer.Option("--recursive", help="Also explode nested block references.")
+    ] = False,
+    layout: DxfLayout = "Model",
+) -> None:
+    """Explode block references (handles, --name BLOCK or --all) into their entities."""
+    doc = _open_dxf(file)
+    try:
+        if handles:
+            if name is not None or select_all:
+                raise ValueError("Give either handles or --name/--all, not both")
+            selected = handles
+        elif name is not None or select_all:
+            selected = [ref.handle for ref in doc.inserts(layout, name=name)]
+            if not selected:
+                raise ValueError("No block references match the selection")
+        else:
+            raise ValueError("No block references selected: give handles, --name or --all")
+        created = doc.explode(
+            selected, attributes="drop" if drop_attributes else "text", recursive=recursive
+        )
+        typer.echo(f"exploded {len(selected)} references into {len(created)} entities", err=True)
         typer.echo(str(doc.save(output)))
     except _DXF_ERRORS as exc:
         raise _dxf_error(exc) from None
