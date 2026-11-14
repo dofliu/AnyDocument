@@ -1,7 +1,8 @@
 """FastAPI application of the AnyDocument API service.
 
 The skeleton offers a health check, document upload (size-limited), session storage
-with a TTL, listing, download and deletion. Interactive API documentation lives under
+with a TTL, listing, download and deletion, plus the viewing endpoints (document
+information, parts, text and rendered images). Interactive API documentation lives under
 ``/api/docs`` because ``/docs`` is the document collection.
 """
 
@@ -10,11 +11,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
@@ -32,6 +33,15 @@ from anydoc.core.errors import (
 from anydoc.core.registry import registry
 from anydoc.server.settings import ServerSettings
 from anydoc.server.store import DocumentRecord, SessionNotFoundError, SessionStore
+from anydoc.server.views import (
+    PartNotFoundError,
+    document_info,
+    document_parts,
+    document_text,
+    render_etag,
+    render_info,
+    render_part,
+)
 
 __all__ = ["create_app"]
 
@@ -43,6 +53,7 @@ _MULTIPART_OVERHEAD = 64 * 1024
 
 _ERROR_STATUS: tuple[tuple[type[AnyDocError], int, str], ...] = (
     (SessionNotFoundError, 404, "not_found"),
+    (PartNotFoundError, 404, "part_not_found"),
     (UnsupportedFormatError, 415, "unsupported_format"),
     (CorruptFileError, 422, "corrupt_file"),
     (ExternalToolMissingError, 501, "external_tool_missing"),
@@ -90,6 +101,88 @@ class DocumentInfo(BaseModel):
     accessed: str = Field(description="Last access time (ISO 8601, UTC).")
     expires: str = Field(description="Expiry time; renewed on each access.")
     download_url: str
+
+
+class MetadataInfo(BaseModel):
+    """Format-independent metadata read from the document itself."""
+
+    format: str
+    mime: str
+    title: str | None = None
+    author: str | None = None
+    created: str | None = Field(default=None, description="ISO 8601 creation time.")
+    modified: str | None = Field(default=None, description="ISO 8601 modification time.")
+    page_count: int | None = None
+    extra: dict[str, Any] = Field(
+        default_factory=dict, description="Format-specific details (sheets, layers, ...)."
+    )
+
+
+class RenderOptions(BaseModel):
+    """How a document can be rendered through ``/docs/{id}/render/{part}``."""
+
+    unit: str = Field(description="What a render index addresses: page, layout, frame, ...")
+    formats: list[str] = Field(description="Available image formats.")
+
+
+class DocumentDetails(BaseModel):
+    """Session data of a document together with what its handler reads from it."""
+
+    id: str
+    filename: str
+    format: str
+    mime: str
+    size: int = Field(description="Size in bytes.")
+    metadata: MetadataInfo
+    part_count: int = Field(description="Number of structural parts (see ``/parts``).")
+    capabilities: list[str]
+    render: RenderOptions
+    parts_url: str
+    text_url: str
+    render_url: str
+
+
+class PartInfo(BaseModel):
+    """A page, sheet, slide, layout, frame, ... of a document."""
+
+    kind: str
+    index: int
+    name: str | None = None
+    size: list[float] | None = Field(
+        default=None, description="Width and height in the part's native unit."
+    )
+
+
+class PartList(BaseModel):
+    """The structural parts of a document."""
+
+    id: str
+    format: str
+    count: int
+    parts: list[PartInfo]
+
+
+class TextResponse(BaseModel):
+    """A window of the document text (offsets and lengths count characters)."""
+
+    id: str
+    format: str
+    text: str
+    offset: int
+    length: int
+    total: int = Field(description="Length of the whole text.")
+    truncated: bool = Field(description="Whether text remains after this window.")
+
+
+class RenderList(BaseModel):
+    """The renderable units of a document."""
+
+    id: str
+    format: str
+    unit: str
+    count: int
+    formats: list[str]
+    urls: list[str] = Field(description="Render URL of every unit, in order.")
 
 
 class ErrorDetail(BaseModel):
@@ -337,6 +430,150 @@ def create_app(
             media_type=record.mime or "application/octet-stream",
             filename=record.filename,
         )
+
+    @app.get(
+        "/docs/{doc_id}/info",
+        response_model=DocumentDetails,
+        tags=["viewing"],
+        responses=_errors(404, 415, 422),
+    )
+    def info(record: _RecordDep) -> DocumentDetails:
+        """Return the document's metadata, part count, capabilities and render options."""
+        base = f"/docs/{record.id}"
+        return DocumentDetails(
+            id=record.id,
+            filename=record.filename,
+            format=record.format,
+            mime=record.mime,
+            size=record.size,
+            parts_url=f"{base}/parts",
+            text_url=f"{base}/text",
+            render_url=f"{base}/render",
+            **document_info(record.path, record.format),
+        )
+
+    @app.get(
+        "/docs/{doc_id}/parts",
+        response_model=PartList,
+        tags=["viewing"],
+        responses=_errors(404, 415, 422),
+    )
+    def parts(record: _RecordDep) -> PartList:
+        """List the structural parts: pages, sheets, slides, layouts, frames, ..."""
+        items = [PartInfo(**part) for part in document_parts(record.path)]
+        return PartList(id=record.id, format=record.format, count=len(items), parts=items)
+
+    @app.get(
+        "/docs/{doc_id}/text",
+        response_model=TextResponse,
+        tags=["viewing"],
+        responses={
+            200: {"content": {"text/plain": {}}, "description": "The text (JSON or plain)."},
+            **_errors(404, 415, 422),
+        },
+    )
+    def text(
+        record: _RecordDep,
+        offset: Annotated[int, Query(ge=0, description="First character to return.")] = 0,
+        limit: Annotated[
+            int | None, Query(ge=1, description="Largest number of characters to return.")
+        ] = None,
+        output: Annotated[
+            Literal["json", "plain"],
+            Query(alias="format", description="`json` (default) or `plain` (text/plain)."),
+        ] = "json",
+    ) -> Response:
+        """Return the document text in reading order, optionally a character window."""
+        window = document_text(record.path, offset=offset, limit=limit)
+        if output == "plain":
+            return PlainTextResponse(
+                window.text,
+                headers={
+                    "X-Text-Offset": str(window.offset),
+                    "X-Text-Total": str(window.total),
+                    "X-Text-Truncated": str(window.truncated).lower(),
+                },
+            )
+        payload = TextResponse(
+            id=record.id,
+            format=record.format,
+            text=window.text,
+            offset=window.offset,
+            length=window.length,
+            total=window.total,
+            truncated=window.truncated,
+        )
+        return JSONResponse(payload.model_dump())
+
+    @app.get(
+        "/docs/{doc_id}/render",
+        response_model=RenderList,
+        tags=["viewing"],
+        responses=_errors(404, 415, 422, 501),
+    )
+    def render_index(record: _RecordDep) -> RenderList:
+        """List what can be rendered: unit kind, count, formats and one URL per unit.
+
+        Office/ODF/RTF documents are converted to PDF on first use (needs LibreOffice;
+        the rendition is cached for the session), so the first call may take a while.
+        """
+        details = render_info(record.path, record.format)
+        return RenderList(
+            id=record.id,
+            format=record.format,
+            unit=details.unit,
+            count=details.count,
+            formats=list(details.formats),
+            urls=[f"/docs/{record.id}/render/{n}" for n in range(details.count)],
+        )
+
+    @app.get(
+        "/docs/{doc_id}/render/{part}",
+        response_class=Response,
+        tags=["viewing"],
+        responses={
+            200: {
+                "content": {
+                    "image/png": {},
+                    "image/jpeg": {},
+                    "image/webp": {},
+                    "image/svg+xml": {},
+                },
+                "description": "The rendered image.",
+            },
+            304: {"description": "The cached image is still current (`If-None-Match`)."},
+            **_errors(400, 404, 415, 422, 501),
+        },
+    )
+    def render(
+        request: Request,
+        record: _RecordDep,
+        part: int,
+        output: Annotated[
+            Literal["png", "jpeg", "jpg", "webp", "svg"],
+            Query(alias="format", description="Image format; `svg` only for SVG/DXF/DWG."),
+        ] = "png",
+        size: Annotated[
+            int, Query(ge=16, le=4096, description="Longest side of a raster image (px).")
+        ] = 1024,
+    ) -> Response:
+        """Render one page, slide, layout or frame (0-based) as PNG/JPEG/WebP or SVG."""
+        etag = render_etag(record.path, part, output, size)
+        headers = {
+            "ETag": etag,
+            "Cache-Control": "private, no-cache",
+            "X-Content-Type-Options": "nosniff",
+            # Uploaded SVG is untrusted: never let it run scripts when opened directly.
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        }
+        candidates = {
+            tag.strip().removeprefix("W/")
+            for tag in request.headers.get("if-none-match", "").split(",")
+        }
+        if etag in candidates:
+            return Response(status_code=304, headers=headers)
+        image = render_part(record.path, record.format, part, fmt=output, size=size)
+        return Response(image.data, media_type=image.media_type, headers=headers)
 
     @app.delete(
         "/docs/{doc_id}",

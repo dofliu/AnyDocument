@@ -360,6 +360,11 @@ def test_openapi_schema(client: TestClient) -> None:
         "/docs",
         "/docs/{doc_id}",
         "/docs/{doc_id}/download",
+        "/docs/{doc_id}/info",
+        "/docs/{doc_id}/parts",
+        "/docs/{doc_id}/text",
+        "/docs/{doc_id}/render",
+        "/docs/{doc_id}/render/{part}",
     }
     assert set(schema["paths"]["/docs"]) == {"get", "post"}
     assert set(schema["paths"]["/docs/{doc_id}"]) == {"get", "delete"}

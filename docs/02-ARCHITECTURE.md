@@ -140,3 +140,6 @@ Python 版本：**≥ 3.11**（容器內為 3.13）。
 - API 路由：文件集合為 `/docs`（`POST /docs` 上傳、`/docs/{id}`、`/docs/{id}/download`），因此互動式 API 文件改掛在
   `/api/docs`（Swagger）與 `/api/redoc`，OpenAPI 於 `/openapi.json`；錯誤一律回傳 `{"error": {"code", "message"}}`。
   伺服器相依套件（FastAPI、Uvicorn、python-multipart）為選用 extra `server`。
+- 檢視端點（`anydoc.server.views`，可脫離框架單獨使用）：`/docs/{id}/info`、`/parts`、`/text`（`offset`/`limit` 字元視窗、`format=plain`）、
+  `/render`（可渲染單位清單）與 `/render/{part}`（`format=png|jpeg|webp|svg`、`size` 16–4096，含 ETag/304）。Office/ODF/RTF 經 LibreOffice
+  轉 PDF 後渲染，PDF 快取於工作階段目錄 `.cache/`（以檔案 mtime+size 為鍵）。上傳的 SVG 原樣回傳但加上 CSP `sandbox` 與 `nosniff`。
